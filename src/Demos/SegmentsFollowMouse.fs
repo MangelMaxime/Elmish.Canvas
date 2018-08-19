@@ -382,14 +382,16 @@ let settings model dispatch =
             [ Label.label [ ]
                 [ str "Number of segments"
                   Control.div [ ]
-                    [ Input.number [ Input.OnChange (fun ev ->
+                    [ Input.input [ Input.OnChange (fun ev ->
                                                     ev.Value
                                                     |> ChangeNum
                                                     |> dispatch)
-                                     Input.Value (string model.NumOfSegments)
-                                     Input.Props [ Min "5"
-                                                   Max "30"
-                                                   Step "1" ] ] ] ] ]
+                                    Input.Value (string model.NumOfSegments)
+
+                                    Input.Props [ Min "5"
+                                                  Max "30"
+                                                  Step "1"
+                                                  HTMLAttr.Type "range" ] ] ] ] ]
           Field.div [ ]
             [ Label.label [ ]
                 [ str "Follow speed"
@@ -401,7 +403,8 @@ let settings model dispatch =
                                      Input.Value (string model.FollowSpeed)
                                      Input.Props [ Min "0.05"
                                                    Max "0.25"
-                                                   Step "0.01" ] ] ] ] ]
+                                                   Step "0.01"
+                                                   HTMLAttr.Type "range" ] ] ] ] ]
           Field.div [ ]
             [ Label.label [ ]
                 [ str "Size"
@@ -413,7 +416,8 @@ let settings model dispatch =
                                      Input.Value (string model.Size)
                                      Input.Props [ Min "5"
                                                    Max "40"
-                                                   Step "2" ] ] ] ] ] ]
+                                                   Step "2"
+                                                   HTMLAttr.Type "range" ] ] ] ] ] ]
 
 let view (model : Model) dispatch =
     div [ Style [ Margin "1em" ] ]

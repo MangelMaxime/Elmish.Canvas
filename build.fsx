@@ -53,7 +53,7 @@ Target.create "Watch" (fun _ ->
 )
 
 Target.create "Publish" (fun _ ->
-    Yarn.exec "gh-pages" id
+    Yarn.exec "gh-pages -d output" id
 )
 
 // Build order
