@@ -59,10 +59,10 @@ let private update msg model =
 
 let private navbar =
     Navbar.navbar [ Navbar.IsFixedTop
-                    Navbar.Color IsPrimary ]
+                    Navbar.Color IsLink ]
         [ Navbar.Brand.div [ ]
             [ Navbar.Item.div [ ]
-                [ Heading.h4 [ ]
+                [ Heading.h4 [ Heading.Props [ Style [ Color "white" ] ] ]
                     [ str "Elmish canvas (demos)" ] ] ] ]
 
 // Helper to generate a menu item
@@ -89,22 +89,8 @@ let menu =
           Card.content [ ]
             [ // Menu rendering
               Menu.menu [ ]
-                [ Menu.label [ ] [ str "General" ]
-                  Menu.list [ ]
-                    [ menuItem "Dashboard" false
-                      menuItem "Customers" false ]
-                  Menu.label [ ] [ str "Administration" ]
-                  Menu.list [ ]
-                    [ menuItem "Team Settings" false
-                      subMenu "Manage your Team" true
-                            [ menuItem "Members" false
-                              menuItem "Plugins" false
-                              menuItem "Add a member" false ] ]
-                  Menu.label [ ] [ str "Transactions" ]
-                  Menu.list [ ]
-                    [ menuItem "Payments" false
-                      menuItem "Transfers" false
-                      menuItem "Balance" false ] ] ] ]
+                [ Menu.list [ ]
+                    [ menuItem "Team Settings" false ] ] ] ]
 
 let about =
     Card.card [ ]

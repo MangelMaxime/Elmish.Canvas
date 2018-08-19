@@ -52,11 +52,16 @@ Target.create "Watch" (fun _ ->
     if not result.OK then failwithf "dotnet fable failed with code %i" result.ExitCode
 )
 
+Target.create "Publish" (fun _ ->
+    Yarn.exec "gh-pages" id
+)
+
 // Build order
 "Clean"
     ==> "Install"
     ==> "YarnInstall"
     ==> "Build"
+    ==> "Publish"
 
 "Watch"
     <== [ "YarnInstall" ]

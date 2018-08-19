@@ -23,6 +23,7 @@
     "babel-preset-env": "^1.7.0",
     "babel-preset-react": "^6.24.1",
     "bulma": "^0.7.1",
+    "bulma-slider": "^2.0.0",
     "copy-webpack-plugin": "^4.5.2",
     "css-loader": "^0.28.11",
     "cssnano": "^3.10.0",

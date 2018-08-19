@@ -1,7 +1,6 @@
 [<AutoOpen>]
 module Global
 
-
 type Position =
     { X : float
       Y : float }

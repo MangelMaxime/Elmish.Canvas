@@ -118,7 +118,9 @@ let parseText (text : string) =
 
 [<Pojo>]
 type Props =
-    { FilePath : string }
+    { FilePath : string
+      Separator : string
+      Url : string }
 
 [<Pojo>]
 type State =
@@ -128,10 +130,16 @@ type LiterateCode (props) =
     inherit React.Component<Props, State>(props)
     do base.setInitState({ Content = [] })
 
+    member this.fileUrl
+        with get () =
+            let splitAt = this.props.FilePath.IndexOf(this.props.Separator) + this.props.Separator.Length
+
+            this.props.Url + this.props.FilePath.Substring(splitAt)
+
     override this.componentDidMount() =
-        let url = "/Demos/SegmentsFollowMouse.fs"
+
         promise {
-            let! res = Fetch.fetch url []
+            let! res = Fetch.fetch this.fileUrl []
             let! text = res.text()
             let parsed = parseText text
 
@@ -143,18 +151,28 @@ type LiterateCode (props) =
         this.setState({ this.state with Content = text })
 
     override this.render() =
-        this.state.Content
-        |> List.map (function
-            | Paragraph.Content text ->
-                Render.contentFromMarkdown [ ]
-                    text
-            | Paragraph.Code text ->
-                ReactHighlight.highlight [ ReactHighlight.ClassName "fsharp" ]
-                    [ str text ]
-        )
-        |> Content.content [ ]
+        let text =
+            this.state.Content
+            |> List.map (function
+                | Paragraph.Content text ->
+                    Render.contentFromMarkdown [ ]
+                        text
+                | Paragraph.Code text ->
+                    ReactHighlight.highlight [ ReactHighlight.ClassName "fsharp" ]
+                        [ str text ]
+            )
 
-let view filePath =
+        let sourceCodeUrl =
+            Text.div [ Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
+                [ a [ Href this.fileUrl ]
+                    [ str "Source code" ] ]
+
+        Content.content [ ]
+            (sourceCodeUrl::text)
+
+let view filePath separator url =
     ofType<LiterateCode,_,_>
-        { FilePath = filePath }
+        { FilePath = filePath
+          Separator = separator
+          Url = url }
         [ ]
