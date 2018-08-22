@@ -158,8 +158,11 @@ type LiterateCode (props) =
                     Render.contentFromMarkdown [ ]
                         text
                 | Paragraph.Code text ->
-                    ReactHighlight.highlight [ ReactHighlight.ClassName "fsharp" ]
-                        [ str text ]
+                    // ReactHighlight.highlight [ ReactHighlight.ClassName "fsharp" ]
+                    //     [ str text ]
+                    pre [ ]
+                        [ code [ ]
+                            [ str text ] ]
             )
 
         let sourceCodeUrl =

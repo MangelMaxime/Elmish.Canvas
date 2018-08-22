@@ -65,7 +65,12 @@ module.exports = {
             }),
             new CopyWebpackPlugin([
                 { from: './static' }
-            ])
+            ]),
+            new webpack.DefinePlugin({
+                'process.env': {
+                    'NODE_ENV': JSON.stringify('production')
+                }
+            })
         ])
         : commonPlugins.concat([
             new webpack.HotModuleReplacementPlugin(),
@@ -79,8 +84,8 @@ module.exports = {
     },
     devServer: {
         contentBase:
-            [ resolve('./static/'),
-              resolve('./src') ],
+            [resolve('./static/'),
+            resolve('./src')],
         publicPath: "/",
         port: 8080,
         hot: true,
