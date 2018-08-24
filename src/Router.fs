@@ -7,6 +7,7 @@ open Elmish.Browser.UrlParser
 
 type DemoRoute =
     | SegmentsFollowMouse
+    | MovingBox
 
 type Route =
     | Home
@@ -17,11 +18,13 @@ let private toHash page =
     | Demo demoPage ->
         match demoPage with
         | SegmentsFollowMouse -> "#segments-follow-mouse"
+        | MovingBox -> "#moving-box"
     | Home -> "#/"
 
 let pageParser: Parser<Route->Route,Route> =
     oneOf [
         map (DemoRoute.SegmentsFollowMouse |> Demo) (s "segments-follow-mouse")
+        map (DemoRoute.MovingBox |> Demo) (s "moving-box")
         map Home top ]
 
 let href route =

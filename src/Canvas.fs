@@ -20,7 +20,8 @@ type DrawOp =
     | FillStyle of U3<string,Browser.CanvasGradient,Browser.CanvasPattern>
     | Batch of DrawOp list
     | Stroke
-    | ClearReact of (float * float * float * float)
+    | ClearRect of (float * float * float * float)
+    | FillRect of (float * float * float * float)
 
 let rec drawOps (ctx : Browser.CanvasRenderingContext2D) (ops : DrawOp list) =
     for op in ops do
@@ -38,7 +39,8 @@ let rec drawOps (ctx : Browser.CanvasRenderingContext2D) (ops : DrawOp list) =
         | Restore -> ctx.restore()
         | Fill -> ctx.fill()
         | FillStyle opts -> ctx.fillStyle <- opts
-        | ClearReact opts -> ctx.clearRect opts
+        | ClearRect opts -> ctx.clearRect opts
+        | FillRect opts -> ctx.fillRect opts
 
 type private Props =
     | Height of float

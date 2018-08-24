@@ -261,7 +261,7 @@ module Demo =
             |> MouseMove
             |> dispatch
         )
-        |> Canvas.draw (Canvas.ClearReact (0., 0., model.Settings.CanvasWidth, model.Settings.CanvasHeight))
+        |> Canvas.draw (Canvas.ClearRect (0., 0., model.Settings.CanvasWidth, model.Settings.CanvasHeight))
         |> Canvas.draw (drawParticles model width )
         |> Canvas.render
 

@@ -14,8 +14,16 @@ class Canvas extends React.Component {
     }
 
     componentDidMount() {
-        drawOps(this.getContext(), this.props.drawOps);
+        // drawOps(this.getContext(), this.props.drawOps);
         // this.refs.canvas.addEventListener("mousemove", this.mouveMove, false);
+        requestAnimationFrame(this.onFrame);
+    }
+
+    onFrame = time => {
+        console.log(this.props.width);
+        drawOps(this.getContext(), this.props.drawOps);
+        this.props.onTick();
+        requestAnimationFrame(this.onFrame);
     }
 
     componentDidUpdate() {
@@ -26,7 +34,7 @@ class Canvas extends React.Component {
             // Would be nice if we could use RAF here directly for more control perhaps ?
             // this.props.onTick();
         // }
-        drawOps(this.getContext(), this.props.drawOps);
+        // drawOps(this.getContext(), this.props.drawOps);
     }
 
     getContext() {
@@ -56,4 +64,6 @@ Canvas.propTypes = {
     style : PropTypes.object
 };
 
-export default ReactAnimationFrame(Canvas);
+// export default ReactAnimationFrame(Canvas);
+
+export default Canvas;

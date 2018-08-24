@@ -9,6 +9,7 @@ open Fable.Import
 
 type Demo =
     | SegmentsFollowMouse of Demos.SegmentsFollowMouse.Model
+    | MovingBox of Demos.MovingBox.Model
 
 type Page =
     | Home
@@ -20,6 +21,7 @@ type Model =
 
 type Msg =
     | SegmentsFollowMouseMsg of Demos.SegmentsFollowMouse.Msg
+    | MovingBoxMsg of Demos.MovingBox.Msg
 
 let urlUpdate (result : Option<Router.Route>) model =
     match result with
@@ -40,6 +42,13 @@ let urlUpdate (result : Option<Router.Route>) model =
                                 |> Demo.SegmentsFollowMouse
                                 |> Page.Demo }, Cmd.map SegmentsFollowMouseMsg subCmd
 
+        | Router.Demo Router.DemoRoute.MovingBox ->
+            let (subModel, subCmd) = Demos.MovingBox.init ()
+            { model with CurrentPage =
+                                subModel
+                                |> Demo.MovingBox
+                                |> Page.Demo }, Cmd.map MovingBoxMsg subCmd
+
 let init result =
     urlUpdate result { CurrentRoute = Router.Route.Home
                        CurrentPage = Home }
@@ -57,6 +66,17 @@ let private update msg model =
         | _ ->
             model, Cmd.none
 
+    | MovingBoxMsg subMsg ->
+        match model with
+        | { CurrentPage = Page.Demo (Demo.MovingBox subModel) } ->
+            let (newModel, newCmd) = Demos.MovingBox.update subMsg subModel
+            { model with CurrentPage =
+                            newModel
+                            |> Demo.MovingBox
+                            |> Page.Demo } , Cmd.map MovingBoxMsg newCmd
+        | _ ->
+            model, Cmd.none
+
 let private navbar =
     Navbar.navbar [ Navbar.IsFixedTop
                     Navbar.Color IsLink ]
@@ -66,9 +86,9 @@ let private navbar =
                     [ str "Elmish canvas (demos)" ] ] ] ]
 
 // Helper to generate a menu item
-let menuItem label isActive =
+let menuItem label isActive route =
     Menu.Item.li [ Menu.Item.IsActive isActive
-                   Menu.Item.Props [ (Router.href (Router.Demo Router.DemoRoute.SegmentsFollowMouse)) ] ]
+                   Menu.Item.Props [ Router.href route ] ]
        [ str label ]
 
 // Helper to generate a sub menu
@@ -90,7 +110,8 @@ let menu =
             [ // Menu rendering
               Menu.menu [ ]
                 [ Menu.list [ ]
-                    [ menuItem "Team Settings" false ] ] ] ]
+                    [ menuItem "Segments follow mouse" false (Router.Demo Router.DemoRoute.SegmentsFollowMouse)
+                      menuItem "Moving box" false (Router.Demo Router.DemoRoute.MovingBox) ] ] ] ]
 
 let about =
     Card.card [ ]
@@ -110,6 +131,8 @@ let private view model dispatch =
         match model.CurrentPage with
         | Page.Demo (Demo.SegmentsFollowMouse subModel) ->
             Demos.SegmentsFollowMouse.view subModel (SegmentsFollowMouseMsg >> dispatch)
+        | Page.Demo (Demo.MovingBox subModel) ->
+            Demos.MovingBox.view subModel (MovingBoxMsg >> dispatch)
         | Page.Home ->
             str "home"
 
