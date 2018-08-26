@@ -10,6 +10,7 @@ open Fable.Import
 type Demo =
     | SegmentsFollowMouse of Demos.SegmentsFollowMouse.Model
     | MovingBox of Demos.MovingBox.Model
+    | GameOfLife of Demos.GameOfLife.Model
 
 type Page =
     | Home
@@ -22,6 +23,7 @@ type Model =
 type Msg =
     | SegmentsFollowMouseMsg of Demos.SegmentsFollowMouse.Msg
     | MovingBoxMsg of Demos.MovingBox.Msg
+    | GameOfLifeMsg of Demos.GameOfLife.Msg
 
 let urlUpdate (result : Option<Router.Route>) model =
     match result with
@@ -49,6 +51,13 @@ let urlUpdate (result : Option<Router.Route>) model =
                                 |> Demo.MovingBox
                                 |> Page.Demo }, Cmd.map MovingBoxMsg subCmd
 
+        | Router.Demo Router.DemoRoute.GameOfLife ->
+            let (subModel, subCmd) = Demos.GameOfLife.init ()
+            { model with CurrentPage =
+                                subModel
+                                |> Demo.GameOfLife
+                                |> Page.Demo }, Cmd.map GameOfLifeMsg subCmd
+
 let init result =
     urlUpdate result { CurrentRoute = Router.Route.Home
                        CurrentPage = Home }
@@ -74,6 +83,18 @@ let private update msg model =
                             newModel
                             |> Demo.MovingBox
                             |> Page.Demo } , Cmd.map MovingBoxMsg newCmd
+        | _ ->
+            model, Cmd.none
+
+    | GameOfLifeMsg subMsg ->
+        // On page change if the widget isn't the activeone, allow the component to reset it's state ???
+        match model with
+        | { CurrentPage = Page.Demo (Demo.GameOfLife subModel) } ->
+            let (newModel, newCmd) = Demos.GameOfLife.update subMsg subModel
+            { model with CurrentPage =
+                            newModel
+                            |> Demo.GameOfLife
+                            |> Page.Demo } , Cmd.map GameOfLifeMsg newCmd
         | _ ->
             model, Cmd.none
 
@@ -111,7 +132,8 @@ let menu =
               Menu.menu [ ]
                 [ Menu.list [ ]
                     [ menuItem "Segments follow mouse" false (Router.Demo Router.DemoRoute.SegmentsFollowMouse)
-                      menuItem "Moving box" false (Router.Demo Router.DemoRoute.MovingBox) ] ] ] ]
+                      menuItem "Moving box" false (Router.Demo Router.DemoRoute.MovingBox)
+                      menuItem "Game of Life" false (Router.Demo Router.DemoRoute.GameOfLife) ] ] ] ]
 
 let about =
     Card.card [ ]
@@ -133,6 +155,8 @@ let private view model dispatch =
             Demos.SegmentsFollowMouse.view subModel (SegmentsFollowMouseMsg >> dispatch)
         | Page.Demo (Demo.MovingBox subModel) ->
             Demos.MovingBox.view subModel (MovingBoxMsg >> dispatch)
+        | Page.Demo (Demo.GameOfLife subModel) ->
+            Demos.GameOfLife.view subModel (GameOfLifeMsg >> dispatch)
         | Page.Home ->
             str "home"
 

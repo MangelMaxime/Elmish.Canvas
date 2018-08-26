@@ -7,23 +7,37 @@ class Canvas extends React.Component {
 
     constructor(props) {
         super(props);
-    }
-
-    onAnimationFrame(timestamp, lastTimestamp) {
-        this.props.onTick(timestamp, lastTimestamp);
+        this.lastFrameTimeMs = 0;
+        this.frameId = 0;
     }
 
     componentDidMount() {
         // drawOps(this.getContext(), this.props.drawOps);
         // this.refs.canvas.addEventListener("mousemove", this.mouveMove, false);
         requestAnimationFrame(this.onFrame);
+        // console.log("Mount:", performance.now());
     }
 
-    onFrame = time => {
-        console.log(this.props.width);
-        drawOps(this.getContext(), this.props.drawOps);
-        this.props.onTick();
-        requestAnimationFrame(this.onFrame);
+    onFrame = timestamp => {
+        if (timestamp < this.lastFrameTimeMs + (1000 / this.props.maxFPS)) {
+            requestAnimationFrame(this.onFrame);
+            return;
+        }
+
+        let delta = timestamp - this.lastFrameTimeMs;
+        this.lastFrameTimeMs = timestamp;
+        const timestep = 1000/this.props.maxFPS;
+        console.log("onFrame", this.frameId, " | Steps: ", delta / timestep );
+
+        while (delta >= timestep) {
+            this.props.onTick([timestep, 10.]);
+            delta -= timestep;
+        }
+        this.frameId += 1;
+
+        // console.log(this.props.onTick());
+        // console.log("OnFrame_end:", performance.now());
+        // requestAnimationFrame(this.onFrame);
     }
 
     componentDidUpdate() {
@@ -35,6 +49,10 @@ class Canvas extends React.Component {
             // this.props.onTick();
         // }
         // drawOps(this.getContext(), this.props.drawOps);
+        console.log("DidUpdate", this.frameId);
+        drawOps(this.getContext(), this.props.drawOps);
+        // console.log("DidUpdate:", performance.now());
+        requestAnimationFrame(this.onFrame);
     }
 
     getContext() {
@@ -53,16 +71,6 @@ class Canvas extends React.Component {
         );
     }
 }
-
-Canvas.propTypes = {
-    width: PropTypes.number,
-    height: PropTypes.number,
-    drawOps: PropTypes.array,
-    isPlaying: PropTypes.bool,
-    onTick: PropTypes.func,
-    onMouseMove: PropTypes.func,
-    style : PropTypes.object
-};
 
 // export default ReactAnimationFrame(Canvas);
 

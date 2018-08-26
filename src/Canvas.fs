@@ -22,6 +22,7 @@ type DrawOp =
     | Stroke
     | ClearRect of (float * float * float * float)
     | FillRect of (float * float * float * float)
+    | StrokeStyle of U3<string,Browser.CanvasGradient,Browser.CanvasPattern>
 
 let rec drawOps (ctx : Browser.CanvasRenderingContext2D) (ops : DrawOp list) =
     for op in ops do
@@ -41,6 +42,7 @@ let rec drawOps (ctx : Browser.CanvasRenderingContext2D) (ops : DrawOp list) =
         | FillStyle opts -> ctx.fillStyle <- opts
         | ClearRect opts -> ctx.clearRect opts
         | FillRect opts -> ctx.fillRect opts
+        | StrokeStyle opts -> ctx.strokeStyle <- opts
 
 type private Props =
     | Height of float
@@ -50,6 +52,7 @@ type private Props =
     | IsPlaying of bool
     | OnMouseMove of (React.MouseEvent -> unit)
     | Style of HTMLAttr
+    | MaxFPS of int
 
 open Fable.Core.JsInterop
 
@@ -63,7 +66,8 @@ type CanvasBuilder =
       IsPlaying : bool
       OnTick : (float * float) -> unit
       OnMouseMove : React.MouseEvent -> unit
-      Style : CSSProp list }
+      Style : CSSProp list
+      MaxFPS : int }
 
 let inline private canvas (props: Props list) : React.ReactElement =
     ofImport "default" "./js/react_canvas.js" (keyValueList CaseRules.LowerFirst props) [ ]
@@ -74,7 +78,8 @@ let initialize (size : Size) : CanvasBuilder =
       OnTick = ignore
       IsPlaying = true
       OnMouseMove = ignore
-      Style = [] }
+      Style = []
+      MaxFPS = 30 }
 
 let draw (drawOp : DrawOp) (builder : CanvasBuilder) : CanvasBuilder =
     { builder with DrawOps = builder.DrawOps @ [drawOp] }
@@ -91,6 +96,9 @@ let onMouseMove callback (builder : CanvasBuilder) : CanvasBuilder =
 let withStyle style (builder : CanvasBuilder) : CanvasBuilder =
     { builder with Style = style }
 
+let withMaxFPS fps (builder : CanvasBuilder) : CanvasBuilder =
+    { builder with MaxFPS = fps }
+
 let render (builder : CanvasBuilder) =
     canvas [ Width builder.Size.Width
              Height builder.Size.Height
@@ -98,4 +106,5 @@ let render (builder : CanvasBuilder) =
              OnTick builder.OnTick
              IsPlaying builder.IsPlaying
              OnMouseMove builder.OnMouseMove
-             Style !!(keyValueList CaseRules.LowerFirst builder.Style) ]
+             Style !!(keyValueList CaseRules.LowerFirst builder.Style)
+             MaxFPS builder.MaxFPS ]

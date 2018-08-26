@@ -29,7 +29,7 @@ module Demo =
     *)
     type Msg =
         /// The tick message is trigger at 60fps, and is responsible for the animation trigger
-        | Tick
+        | Tick of float * float
         (* hide *)
         | UpdateCanvasSize of float * float
         (* end-hide *)
@@ -43,7 +43,7 @@ module Demo =
           Box =
             { X = 20.
               Y = 20. }
-          BoxVelocity = 3. }, Cmd.ofMsg Tick
+          BoxVelocity = 0.08 }, Cmd.none
 
     (**
 #### Update function
@@ -51,10 +51,10 @@ module Demo =
     let update msg model =
         match msg with
         // Update the animation
-        | Tick ->
-            let boxPos = model.Box.X + model.BoxVelocity
+        | Tick (delta, _) ->
+            let boxPos = model.Box.X + model.BoxVelocity * delta
             let boxVelocity =
-                if boxPos <= 0. || boxPos >= model.CanvasWidth - 40. then
+                if boxPos <= 0. || boxPos >= model.CanvasWidth / 4. then
                     -model.BoxVelocity
                 else
                     model.BoxVelocity
@@ -84,7 +84,8 @@ module Demo =
 
         size
         |> Canvas.initialize
-        |> Canvas.onTick (fun _ -> dispatch Tick)
+        |> Canvas.onTick (Tick >> dispatch)
+        |> Canvas.withMaxFPS 10
         |> Canvas.draw (Canvas.ClearRect (0., 0., model.CanvasWidth, model.CanvasHeight))
         |> Canvas.draw (drawBox model)
         |> Canvas.render
