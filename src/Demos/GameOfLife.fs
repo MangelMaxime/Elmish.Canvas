@@ -13,6 +13,8 @@ module Demo =
     open Fable.PowerPack
     open Fable.Import
     open Fable.Core.JsInterop
+    open Fulma
+    open Fulma.FontAwesome
 
     (**
 #### Model
@@ -24,7 +26,9 @@ module Demo =
           World : array<array<int>>
           MaxFPS : float
           LastFrameTimeMs : float
-          CellSize : float }
+          CellSize : float
+          IterationRank : int
+          IsRunning : bool }
 
     (**
 #### Msg
@@ -34,23 +38,30 @@ module Demo =
         | Tick of float
         (* hide *)
         | UpdateCanvasSize of float * float
+        | MouseDown of Position
+        | ToggleState
         (* end-hide *)
+
+    let private rand = new System.Random()
 
     (**
 #### Init function
     *)
+    let private emptyWorld _ =
+        Array.init 200
+            (fun _ -> Array.init 200 (fun _ ->
+                rand.NextDouble() * 10. |> int
+            ))
+
     let init () =
         { CanvasWidth = 0.
           CanvasHeight = 0.
-          World =
-            [|
-                [| 0; 0; 0 |]
-                [| 1; 1; 1 |]
-                [| 0; 0; 0 |]
-            |]
+          World = emptyWorld ()
           MaxFPS = 10.
           LastFrameTimeMs = 0.
-          CellSize = 25. }, Cmd.none
+          CellSize = 25.
+          IterationRank = 0
+          IsRunning = false }, Cmd.none
 
     (**
 #### Update function
@@ -94,34 +105,65 @@ module Demo =
         match msg with
         // Update the animation
         | Tick timestamp ->
-            if timestamp < model.LastFrameTimeMs + (1000. / model.MaxFPS) then
-                // printfn "tick part 1"
-                model, Cmd.onAnimationFrame Tick
+            if model.IsRunning then
+                if timestamp < model.LastFrameTimeMs + (1000. / model.MaxFPS) then
+                    // printfn "tick part 1"
+                    model, Cmd.onAnimationFrame Tick
+                else
+
+                    let ySize = model.World.Length
+                    let xSize = model.World.[0].Length
+
+                    let newWorld =
+                        [| for y = 0 to ySize - 1 do
+                            yield
+                                [| for x = 0 to xSize - 1 do
+                                    let cell = model.World.[y].[x]
+                                    if cell = LIVE then
+                                        // A live cell, stay a live cell if it has 2 or 3 neighbougs
+                                        match calculateNeighbourgs x y model.World with
+                                        | 2
+                                        | 3 -> yield LIVE
+                                        | _ -> yield DEAD
+                                    else
+                                        // A dead cell, becomes a live cell if it has 3 neighbourgs
+                                        match calculateNeighbourgs x y model.World with
+                                        | 3 -> yield LIVE
+                                        | _ -> yield DEAD |]
+                        |]
+                    // printfn "tick part 2"
+                    { model with World = newWorld
+                                 LastFrameTimeMs = timestamp } , Cmd.onAnimationFrame Tick
             else
+                model, Cmd.none
 
-                let ySize = model.World.Length
-                let xSize = model.World.[0].Length
+        | ToggleState ->
+            { model with IsRunning = not model.IsRunning }, Cmd.onAnimationFrame Tick
 
-                let newWorld =
-                    [| for y = 0 to ySize - 1 do
-                        yield
-                            [| for x = 0 to xSize - 1 do
-                                let cell = model.World.[y].[x]
+        | MouseDown position ->
+            let x = JS.Math.floor (position.X / model.CellSize) |> int
+            let y = JS.Math.floor (position.Y / model.CellSize) |> int
+
+            let newWorld =
+                model.World
+                |> Array.mapi (fun index column ->
+                    if index = y then
+                        column
+                        |> Array.mapi (fun index cell ->
+                            if index = x then
+                                // Inverse cell's state
                                 if cell = LIVE then
-                                    // A live cell, stay a live cell if it has 2 or 3 neighbougs
-                                    match calculateNeighbourgs x y model.World with
-                                    | 2
-                                    | 3 -> yield LIVE
-                                    | _ -> yield DEAD
+                                    DEAD
                                 else
-                                    // A dead cell, becomes a live cell if it has 3 neighbourgs
-                                    match calculateNeighbourgs x y model.World with
-                                    | 3 -> yield LIVE
-                                    | _ -> yield DEAD |]
-                    |]
-                // printfn "tick part 2"
-                { model with World = newWorld
-                             LastFrameTimeMs = timestamp } , Cmd.onAnimationFrame Tick
+                                    LIVE
+                            else
+                                cell
+                        )
+                    else
+                        column
+                )
+
+            { model with World = newWorld }, Cmd.none
 
         (* hide *)
         | UpdateCanvasSize (width, height) ->
@@ -134,7 +176,7 @@ module Demo =
     *)
     let drawCell (x : int) (y : int) (cellSize : float) =
         [ Canvas.FillStyle !^"green"
-          Canvas.FillRect (float (x + 1) * cellSize , float (y + 1) * cellSize, cellSize, cellSize) ]
+          Canvas.FillRect (float x * cellSize , float y * cellSize, cellSize, cellSize) ]
         |> Canvas.Batch
 
     let drawWorld (model : Model) =
@@ -185,19 +227,51 @@ module Demo =
     open Fable.Helpers.React
     open Fable.Helpers.React.Props
 
-    let view (model : Model) width dispatch =
+    let private canvasArea model dispatch =
         if not (isNull canvasRef) then
             let context = canvasRef.getContext_2d()
             Canvas.drawOps context (renderCanvas model 0. dispatch)
 
-        canvas [ HTMLAttr.Width model.CanvasWidth
-                 HTMLAttr.Height model.CanvasHeight
-                 Ref (fun elt ->
-                    if not (isNull elt) && isNull canvasRef then
-                        canvasRef <- elt :?> Browser.HTMLCanvasElement
-                        dispatch (Tick 0.)
-                 ) ]
-            [ ]
+        div [ ]
+            [ ReactResizeDetector.detector [ ReactResizeDetector.HandleHeight
+                                             ReactResizeDetector.HandleWidth
+                                             ReactResizeDetector.OnResize (fun width height ->
+                                                dispatch (UpdateCanvasSize (width, height))
+                                            ) ] [ ]
+              canvas [ HTMLAttr.Width model.CanvasWidth
+                       HTMLAttr.Height model.CanvasHeight
+                       OnMouseDown (fun ev ->
+                            let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
+                            { X = ev.clientX - bounds.left
+                              Y = ev.clientY - bounds.top }
+                            |> MouseDown
+                            |> dispatch
+                         )
+                       Ref (fun elt ->
+                            if not (isNull elt) && isNull canvasRef then
+                                canvasRef <- elt :?> Browser.HTMLCanvasElement
+                                dispatch (Tick 0.)
+                         ) ]
+                    [ ] ]
+    let view (model : Model) width dispatch =
+        let icon =
+            if model.IsRunning then
+                Fa.icon Fa.I.Pause
+            else
+                Fa.icon Fa.I.Play
+
+        div [ ]
+            [ Level.level [ ]
+                [ Level.item [ ]
+                    [ Button.button [ Button.IsOutlined
+                                      Button.OnClick (fun _ ->
+                                        dispatch ToggleState
+                                      ) ]
+                        [ Icon.faIcon [ ]
+                            [ icon ] ]
+                    ]
+                ]
+              canvasArea model dispatch ]
 
 (* hide *)
 /////////////////////////////////////////////////////////////////////
@@ -308,13 +382,7 @@ let view (model : Model) dispatch =
                     [ str "this codepen" ] ] ]
           div [ Class "demo" ]
             [ settings model.Inputs dispatch
-              div [ ]
-                [ ReactResizeDetector.detector [ ReactResizeDetector.HandleHeight
-                                                 ReactResizeDetector.HandleWidth
-                                                 ReactResizeDetector.OnResize (fun width height ->
-                                                    dispatch (OnResize (width, height))
-                                                ) ] [ ]
-                  Demo.view model.Demo (float model.Inputs.Size) (DemoMsg >> dispatch) ] ]
+              Demo.view model.Demo (float model.Inputs.Size) (DemoMsg >> dispatch) ]
           div [ Style [ MaxWidth "800px"
                         Margin "auto" ] ]
             [ Elmish.React.Common.lazyView Helpers.View.literateCode (__SOURCE_DIRECTORY__ + "/" + __SOURCE_FILE__) ] ]
