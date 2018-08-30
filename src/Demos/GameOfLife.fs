@@ -20,15 +20,18 @@ module Demo =
 #### Model
     *)
 
+    let [<Literal>] GRID_SIZE = 30
+
     type Model =
         { CanvasWidth : float
           CanvasHeight : float
           World : array<array<int>>
           MaxFPS : float
           LastFrameTimeMs : float
-          CellSize : float
+          CellWidth : float
           IterationRank : int
-          IsRunning : bool }
+          IsRunning : bool
+          IsDragging : bool }
 
     (**
 #### Msg
@@ -39,6 +42,8 @@ module Demo =
         (* hide *)
         | UpdateCanvasSize of float * float
         | MouseDown of Position
+        | MouseUp
+        | MouseDrag of Position
         | ToggleState
         (* end-hide *)
 
@@ -48,8 +53,8 @@ module Demo =
 #### Init function
     *)
     let private emptyWorld _ =
-        Array.init 200
-            (fun _ -> Array.init 200 (fun _ ->
+        Array.init GRID_SIZE
+            (fun _ -> Array.init GRID_SIZE (fun _ ->
                 rand.NextDouble() * 10. |> int
             ))
 
@@ -59,9 +64,10 @@ module Demo =
           World = emptyWorld ()
           MaxFPS = 10.
           LastFrameTimeMs = 0.
-          CellSize = 25.
+          CellWidth = 0.
           IterationRank = 0
-          IsRunning = false }, Cmd.none
+          IsRunning = false
+          IsDragging = false }, Cmd.none
 
     (**
 #### Update function
@@ -70,9 +76,6 @@ module Demo =
     let [<Literal>] DEAD = 0
 
     let calculateNeighbourgs (x : int) (y : int) (world : array<array<int>>) =
-        let ySize = world.Length
-        let xSize = world.[0].Length
-
         [ -1,-1 ; 0,-1 ; 1,-1;
           -1, 0 ;        1, 0;
           -1, 1 ; 0, 1 ; 1, 1; ]
@@ -80,9 +83,9 @@ module Demo =
             let x = x + dx
             let y = y + dy
             if x >= 0
-                && x < xSize
+                && x < GRID_SIZE
                 && y >= 0
-                && y < ySize
+                && y < GRID_SIZE
                 && world.[y].[x] = 1 then
                     1
             else
@@ -111,13 +114,10 @@ module Demo =
                     model, Cmd.onAnimationFrame Tick
                 else
 
-                    let ySize = model.World.Length
-                    let xSize = model.World.[0].Length
-
                     let newWorld =
-                        [| for y = 0 to ySize - 1 do
+                        [| for y = 0 to GRID_SIZE - 1 do
                             yield
-                                [| for x = 0 to xSize - 1 do
+                                [| for x = 0 to GRID_SIZE - 1 do
                                     let cell = model.World.[y].[x]
                                     if cell = LIVE then
                                         // A live cell, stay a live cell if it has 2 or 3 neighbougs
@@ -141,8 +141,8 @@ module Demo =
             { model with IsRunning = not model.IsRunning }, Cmd.onAnimationFrame Tick
 
         | MouseDown position ->
-            let x = JS.Math.floor (position.X / model.CellSize) |> int
-            let y = JS.Math.floor (position.Y / model.CellSize) |> int
+            let x = JS.Math.floor (position.X / model.CellWidth) |> int
+            let y = JS.Math.floor (position.Y / model.CellWidth) |> int
 
             let newWorld =
                 model.World
@@ -163,20 +163,51 @@ module Demo =
                         column
                 )
 
-            { model with World = newWorld }, Cmd.none
+            { model with World = newWorld
+                         IsDragging = true }, Cmd.none
+
+        | MouseDrag position ->
+            let x = JS.Math.floor (position.X / model.CellWidth) |> int
+            let y = JS.Math.floor (position.Y / model.CellWidth) |> int
+
+            // PERFORMANCE: First check if the cell isn't already alive
+            if model.World.[y].[x] = LIVE then
+                model, Cmd.none
+            else
+                let newWorld =
+
+                    model.World
+                    |> Array.mapi (fun index column ->
+                        if index = y then
+                            column
+                            |> Array.mapi (fun index cell ->
+                                if index = x then
+                                    LIVE
+                                else
+                                    cell
+                            )
+                        else
+                            column
+                    )
+
+                { model with World = newWorld }, Cmd.none
+
+        | MouseUp ->
+            { model with IsDragging = false }, Cmd.none
 
         (* hide *)
         | UpdateCanvasSize (width, height) ->
             { model with CanvasWidth = width
-                         CanvasHeight = height }, Cmd.none
+                         CanvasHeight = height
+                         CellWidth = width / float GRID_SIZE }, Cmd.none
         (* end-hide *)
 
     (**
 #### Views
     *)
-    let drawCell (x : int) (y : int) (cellSize : float) =
+    let drawCell (x : int) (y : int) (width : float) (height : float) =
         [ Canvas.FillStyle !^"green"
-          Canvas.FillRect (float x * cellSize , float y * cellSize, cellSize, cellSize) ]
+          Canvas.FillRect (float x * width , float y * height, width, height) ]
         |> Canvas.Batch
 
     let drawWorld (model : Model) =
@@ -187,13 +218,13 @@ module Demo =
             [ for y = 0 to ySize - 1 do
                 for x = 0 to xSize - 1 do
                     if model.World.[y].[x] = 1 then
-                        yield drawCell x y model.CellSize
+                        yield drawCell x y model.CellWidth model.CellWidth
             ]
             |> Canvas.Batch
 
         let grid =
-            let mutable x = model.CellSize
-            let mutable y = model.CellSize
+            let mutable x = model.CellWidth
+            let mutable y = model.CellWidth
 
             [ while x < canvasRef.width do
                 yield Canvas.BeginPath
@@ -201,7 +232,7 @@ module Demo =
                 yield Canvas.LineTo (x, canvasRef.height)
                 yield Canvas.Stroke
 
-                x <- x + model.CellSize
+                x <- x + model.CellWidth
 
               while y < canvasRef.height do
                 yield Canvas.BeginPath
@@ -209,7 +240,7 @@ module Demo =
                 yield Canvas.LineTo (canvasRef.width, y)
                 yield Canvas.Stroke
 
-                y <- y + model.CellSize
+                y <- y + model.CellWidth
              ]
             |> Canvas.Batch
 
@@ -232,27 +263,44 @@ module Demo =
             let context = canvasRef.getContext_2d()
             Canvas.drawOps context (renderCanvas model 0. dispatch)
 
-        div [ ]
+        div [ Style [ Width "500px"
+                      Height "500px"
+                      Margin "auto" ] ]
             [ ReactResizeDetector.detector [ ReactResizeDetector.HandleHeight
                                              ReactResizeDetector.HandleWidth
                                              ReactResizeDetector.OnResize (fun width height ->
                                                 dispatch (UpdateCanvasSize (width, height))
                                             ) ] [ ]
-              canvas [ HTMLAttr.Width model.CanvasWidth
-                       HTMLAttr.Height model.CanvasHeight
-                       OnMouseDown (fun ev ->
-                            let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
-                            { X = ev.clientX - bounds.left
-                              Y = ev.clientY - bounds.top }
-                            |> MouseDown
-                            |> dispatch
-                         )
-                       Ref (fun elt ->
+              canvas [ yield HTMLAttr.Width model.CanvasWidth :> IHTMLProp
+                       yield HTMLAttr.Height model.CanvasHeight :> IHTMLProp
+                       if not model.IsRunning
+                            && model.IsDragging = false then
+                           yield OnMouseDown (fun ev ->
+                                let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
+                                { X = ev.clientX - bounds.left
+                                  Y = ev.clientY - bounds.top }
+                                |> MouseDown
+                                |> dispatch
+                             )  :> IHTMLProp
+                       if not model.IsRunning
+                            && model.IsDragging = true then
+                           yield OnMouseUp (fun _ ->
+                                dispatch MouseUp
+                             )  :> IHTMLProp
+                           yield OnMouseMove (fun ev ->
+                                let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
+                                { X = ev.clientX - bounds.left
+                                  Y = ev.clientY - bounds.top }
+                                |> MouseDrag
+                                |> dispatch
+                             )  :> IHTMLProp
+                       yield Ref (fun elt ->
                             if not (isNull elt) && isNull canvasRef then
                                 canvasRef <- elt :?> Browser.HTMLCanvasElement
                                 dispatch (Tick 0.)
-                         ) ]
+                         ) :> IHTMLProp ]
                     [ ] ]
+
     let view (model : Model) width dispatch =
         let icon =
             if model.IsRunning then
@@ -380,9 +428,7 @@ let view (model : Model) dispatch =
                   a [ Href "https://codepen.io/anon/pen/PBrVdO"
                       Class "is-italic" ]
                     [ str "this codepen" ] ] ]
-          div [ Class "demo" ]
-            [ settings model.Inputs dispatch
-              Demo.view model.Demo (float model.Inputs.Size) (DemoMsg >> dispatch) ]
+          Demo.view model.Demo (float model.Inputs.Size) (DemoMsg >> dispatch)
           div [ Style [ MaxWidth "800px"
                         Margin "auto" ] ]
             [ Elmish.React.Common.lazyView Helpers.View.literateCode (__SOURCE_DIRECTORY__ + "/" + __SOURCE_FILE__) ] ]
