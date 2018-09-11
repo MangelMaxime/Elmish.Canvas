@@ -2,15 +2,44 @@
 module Demos.GameOfLife
 (* end-hide *)
 
+module GlobalListener =
+
+    open Fable.Core
+    open Fable.Import
+    open Fable.Helpers.React
+    open Fable.Helpers.React.Props
+
+    [<Pojo>]
+    type Props =
+        { OnMount : unit -> unit
+          OnUnmount: unit -> unit }
+
+    [<Pojo>]
+    type State = obj
+
+    type GlobalListener(props) =
+        inherit React.Component<Props, State>(props)
+        do base.setInitState(null)
+
+        override __.componentWillUnmount () =
+            props.OnUnmount ()
+
+        override __.componentDidMount () =
+            props.OnMount ()
+
+        override this.render () =
+            fragment [ ]
+                [ ]
+
+    let view props =
+        ofType<GlobalListener,_,_> props [ ]
+
 (**
 ### Elmish component
-
-From here this is a standard Elmish component
 *)
 module Demo =
 
     open Elmish
-    open Fable.PowerPack
     open Fable.Import
     open Fable.Core.JsInterop
     open Fulma
@@ -19,18 +48,39 @@ module Demo =
     (**
 #### Model
     *)
+    module Const =
+        let [<Literal>] GRID_SIZE = 30
+        let [<Literal>] MAX_FPS = 10.
+        let [<Literal>] ALIVE = 1
+        let [<Literal>] DEAD = 0
 
-    let [<Literal>] GRID_SIZE = 30
+    /// Type alias to describe a cell in our World
+    ///
+    /// A cell can have two state:
+    /// - Alive: 1
+    /// - Dead: 0
+    type Cell = int
+
+    type World = array<array<Cell>>
 
     type Model =
-        { CanvasWidth : float
+        { /// Width of the canvas
+          CanvasWidth : float
+          /// Height of the canvas
           CanvasHeight : float
-          World : array<array<int>>
-          MaxFPS : float
+          /// Current world state.
+          World : World
+          /// Last timestamp received from a RAF call
+          ///
+          /// We use it in order to calculate the current FPS
           LastFrameTimeMs : float
+          /// Width of a cell. It's calculated from the current size of the canvas
           CellWidth : float
+          /// Number of iteration in the Game of Life since the start
           IterationRank : int
+          /// Is the game running
           IsRunning : bool
+          /// Is the user dragging
           IsDragging : bool }
 
     (**
@@ -40,21 +90,29 @@ module Demo =
         /// The tick message is trigger at 60fps, and is responsible for the animation trigger
         | Tick of float
         (* hide *)
+        /// Trigger when the canvas size is updated.
+        ///
+        /// Ex:
+        /// - First load of the element
+        /// - Resize of the window
         | UpdateCanvasSize of float * float
         | MouseDown of Position
         | MouseUp
         | MouseDrag of Position
+        /// Allow to toggle between Play/Pause
         | ToggleState
         (* end-hide *)
-
-    let private rand = new System.Random()
 
     (**
 #### Init function
     *)
+
+
     let private emptyWorld _ =
-        Array.init GRID_SIZE
-            (fun _ -> Array.init GRID_SIZE (fun _ ->
+        let rand = new System.Random()
+
+        Array.init Const.GRID_SIZE
+            (fun _ -> Array.init Const.GRID_SIZE (fun _ ->
                 rand.NextDouble() * 10. |> int
             ))
 
@@ -62,7 +120,6 @@ module Demo =
         { CanvasWidth = 0.
           CanvasHeight = 0.
           World = emptyWorld ()
-          MaxFPS = 10.
           LastFrameTimeMs = 0.
           CellWidth = 0.
           IterationRank = 0
@@ -72,8 +129,6 @@ module Demo =
     (**
 #### Update function
     *)
-    let [<Literal>] LIVE = 1
-    let [<Literal>] DEAD = 0
 
     let calculateNeighbourgs (x : int) (y : int) (world : array<array<int>>) =
         [ -1,-1 ; 0,-1 ; 1,-1;
@@ -83,9 +138,9 @@ module Demo =
             let x = x + dx
             let y = y + dy
             if x >= 0
-                && x < GRID_SIZE
+                && x < Const.GRID_SIZE
                 && y >= 0
-                && y < GRID_SIZE
+                && y < Const.GRID_SIZE
                 && world.[y].[x] = 1 then
                     1
             else
@@ -109,30 +164,31 @@ module Demo =
         // Update the animation
         | Tick timestamp ->
             if model.IsRunning then
-                if timestamp < model.LastFrameTimeMs + (1000. / model.MaxFPS) then
+                if timestamp < model.LastFrameTimeMs + (1000. / Const.MAX_FPS) then
                     // printfn "tick part 1"
                     model, Cmd.onAnimationFrame Tick
                 else
 
                     let newWorld =
-                        [| for y = 0 to GRID_SIZE - 1 do
+                        [| for y = 0 to Const.GRID_SIZE - 1 do
                             yield
-                                [| for x = 0 to GRID_SIZE - 1 do
+                                [| for x = 0 to Const.GRID_SIZE - 1 do
                                     let cell = model.World.[y].[x]
-                                    if cell = LIVE then
+                                    if cell = Const.ALIVE then
                                         // A live cell, stay a live cell if it has 2 or 3 neighbougs
                                         match calculateNeighbourgs x y model.World with
                                         | 2
-                                        | 3 -> yield LIVE
-                                        | _ -> yield DEAD
+                                        | 3 -> yield Const.ALIVE
+                                        | _ -> yield Const.DEAD
                                     else
                                         // A dead cell, becomes a live cell if it has 3 neighbourgs
                                         match calculateNeighbourgs x y model.World with
-                                        | 3 -> yield LIVE
-                                        | _ -> yield DEAD |]
+                                        | 3 -> yield Const.ALIVE
+                                        | _ -> yield Const.DEAD |]
                         |]
                     // printfn "tick part 2"
                     { model with World = newWorld
+                                 IterationRank = model.IterationRank + 1
                                  LastFrameTimeMs = timestamp } , Cmd.onAnimationFrame Tick
             else
                 model, Cmd.none
@@ -152,10 +208,10 @@ module Demo =
                         |> Array.mapi (fun index cell ->
                             if index = x then
                                 // Inverse cell's state
-                                if cell = LIVE then
-                                    DEAD
+                                if cell = Const.ALIVE then
+                                    Const.DEAD
                                 else
-                                    LIVE
+                                    Const.ALIVE
                             else
                                 cell
                         )
@@ -171,7 +227,7 @@ module Demo =
             let y = JS.Math.floor (position.Y / model.CellWidth) |> int
 
             // PERFORMANCE: First check if the cell isn't already alive
-            if model.World.[y].[x] = LIVE then
+            if model.World.[y].[x] = Const.ALIVE then
                 model, Cmd.none
             else
                 let newWorld =
@@ -182,7 +238,7 @@ module Demo =
                             column
                             |> Array.mapi (fun index cell ->
                                 if index = x then
-                                    LIVE
+                                    Const.ALIVE
                                 else
                                     cell
                             )
@@ -199,7 +255,7 @@ module Demo =
         | UpdateCanvasSize (width, height) ->
             { model with CanvasWidth = width
                          CanvasHeight = height
-                         CellWidth = width / float GRID_SIZE }, Cmd.none
+                         CellWidth = width / float Const.GRID_SIZE }, Cmd.none
         (* end-hide *)
 
     (**
@@ -249,20 +305,34 @@ module Demo =
           grid
         ] |> Canvas.Batch
 
+    let paused (model : Model) =
+        let text =
+            if model.IsRunning then
+                "Playing"
+            else
+                "Paused"
+        [ Canvas.FillStyle !^"#222222"
+          Canvas.FillRect (model.CanvasWidth - 90., 0., 90., 21.)
+          Canvas.FillStyle !^"rgb(170, 245, 163)"
+          Canvas.TextBaseline "bottom"
+          Canvas.Font "20px Georgia"
+          Canvas.FillText
+            (Canvas.FillTextBuilder.create text
+                |> Canvas.FillTextBuilder.withX (model.CanvasWidth - 75.)
+                |> Canvas.FillTextBuilder.withY 21.)
+        ] |> Canvas.Batch
+
     let private renderCanvas (model : Model) width dispatch =
         [ Canvas.ClearRect (0., 0., model.CanvasWidth, model.CanvasHeight)
           Canvas.FillStyle !^"lightgrey"
           Canvas.FillRect (0., 0., model.CanvasWidth, model.CanvasHeight)
-          drawWorld model ]
+          drawWorld model
+          paused model]
 
     open Fable.Helpers.React
     open Fable.Helpers.React.Props
 
     let private canvasArea model dispatch =
-        if not (isNull canvasRef) then
-            let context = canvasRef.getContext_2d()
-            Canvas.drawOps context (renderCanvas model 0. dispatch)
-
         div [ Style [ Width "500px"
                       Height "500px"
                       Margin "auto" ] ]
@@ -273,6 +343,7 @@ module Demo =
                                             ) ] [ ]
               canvas [ yield HTMLAttr.Width model.CanvasWidth :> IHTMLProp
                        yield HTMLAttr.Height model.CanvasHeight :> IHTMLProp
+                       yield Key "game-of-life" :> IHTMLProp
                        if not model.IsRunning
                             && model.IsDragging = false then
                            yield OnMouseDown (fun ev ->
@@ -297,9 +368,19 @@ module Demo =
                        yield Ref (fun elt ->
                             if not (isNull elt) && isNull canvasRef then
                                 canvasRef <- elt :?> Browser.HTMLCanvasElement
-                                dispatch (Tick 0.)
+
+                            if not (isNull elt) && not (isNull canvasRef) then
+                                let context = canvasRef.getContext_2d()
+                                Canvas.drawOps context (renderCanvas model 0. dispatch)
+
                          ) :> IHTMLProp ]
                     [ ] ]
+
+    (* hide *)
+    let mutable private onKeyPress : Browser.KeyboardEvent -> unit = ignore
+
+    let inline space<'a> = span [ DangerouslySetInnerHTML { __html = "&nbsp;" } ] [ ]
+    (* end-hide *)
 
     let view (model : Model) width dispatch =
         let icon =
@@ -309,14 +390,28 @@ module Demo =
                 Fa.icon Fa.I.Play
 
         div [ ]
-            [ Level.level [ ]
+            [ GlobalListener.view
+                { OnMount = fun () ->
+                    onKeyPress <- fun (ev : Browser.KeyboardEvent) ->
+                        match ev.key with
+                        | " " ->
+                            ev.preventDefault()
+                            dispatch ToggleState
+                        | _ -> ()
+
+                    Browser.window.addEventListener_keypress onKeyPress
+                  OnUnmount = fun () ->
+                    Browser.window.removeEventListener("keypress", !!onKeyPress)
+                    onKeyPress <- ignore }
+              Level.level [ ]
                 [ Level.item [ ]
-                    [ Button.button [ Button.IsOutlined
-                                      Button.OnClick (fun _ ->
-                                        dispatch ToggleState
-                                      ) ]
-                        [ Icon.faIcon [ ]
-                            [ icon ] ]
+                    [ span [ ]
+                        [ str "Use your" ]
+                      space
+                      strong [ ]
+                        [ str "space" ]
+                      space
+                      str " key to Play/Pause the simulation"
                     ]
                 ]
               canvasArea model dispatch ]
@@ -421,13 +516,7 @@ let view (model : Model) dispatch =
     div [ Style [ Margin "1em" ] ]
         [ Content.content [ ]
             [ Heading.h4 [ ]
-                [ str "Game of Life" ]
-              Heading.p [ Heading.Is6
-                          Heading.IsSubtitle ]
-                [ str "This project has been ported from "
-                  a [ Href "https://codepen.io/anon/pen/PBrVdO"
-                      Class "is-italic" ]
-                    [ str "this codepen" ] ] ]
+                [ str "Game of Life" ] ]
           Demo.view model.Demo (float model.Inputs.Size) (DemoMsg >> dispatch)
           div [ Style [ MaxWidth "800px"
                         Margin "auto" ] ]

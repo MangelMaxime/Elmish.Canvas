@@ -6,43 +6,154 @@ open Fable.Helpers.React
 open Fable.Helpers.React.Props
 open Elmish
 
+module JS =
+
+    [<Emit("undefined")>]
+    let inline undefined<'a> : 'a = jsNative
+
+module FillTextBuilder =
+
+    type FillTextBuilder =
+        { Text : string
+          X : float
+          Y : float
+          MaxWidth: float option }
+
+    let create text =
+        { Text = text
+          X = 0.
+          Y = 0.
+          MaxWidth = None }
+
+    let withX x (builder : FillTextBuilder) =
+        { builder with X = x }
+
+    let withY y (builder : FillTextBuilder) =
+        { builder with Y = y }
+
+    let withMaxWidth width (builder : FillTextBuilder) =
+        { builder with MaxWidth = Some width }
+
 type DrawOp =
-    | LineTo of (float * float)
-    | MoveTo of (float * float)
+    | FillStyle of U3<string, Browser.CanvasGradient, Browser.CanvasPattern>
+    | Font of string
+    | GlobalAlpha of float
+    | GlobalCompositeOperation of string
+    | LineCap of string
+    | LineDashOffset of float
+    | LineJoin of string
+    | LineWidth of float
+    | MiterLimit of float
+    | MsFillRule of string
+    | MsImageSmoothingEnabled of bool
+    | ShadowBlur of float
+    | ShadowColor of string
+    | ShadowOffsetX of float
+    | ShadowOffsetY of float
+    | StrokeStyle of U3<string, Browser.CanvasGradient, Browser.CanvasPattern>
+    | TextAlign of string
+    | TextBaseline of string
+    | Arc of (float * float * float * float * float * bool)
+    | ArcTo of (float * float * float * float * float)
     | BeginPath
-    | Scale of (float * float)
+    | BezierCurveTo of (float * float * float * float * float * float)
+    | ClearRect of (float * float * float * float)
+    | Clip of string
+    | ClosePath
+    | CreateImageData of U2<float, Browser.ImageData> * float
+    // | CreateLinearGradient of float * float * float * float -> CanvasGradient
+    // | CreatePattern of U3<HTMLImageElement, HTMLCanvasElement, HTMLVideoElement> * string -> CanvasPattern
+    // | CreateRadialGradient of float * float * float * float * float * float -> CanvasGradient
+    | DrawImage of (U3<Browser.HTMLImageElement, Browser.HTMLCanvasElement, Browser.HTMLVideoElement> * float * float * float * float * float * float * float * float)
+    | Fill
+    | FillRect of (float * float * float * float)
+    | FillText of FillTextBuilder.FillTextBuilder
+    // | GetImageData of float * float * float * float -> ImageData
+    // | GetLineDash
+    // | IsPointInPath of float * float * string -> bool
+    | LineTo of (float * float)
+    // | MeasureText of string -> Browser.TextMetrics
+    | MoveTo of (float * float)
+    | PutImageData of (Browser.ImageData * float * float * float * float * float * float)
+    | QuadraticCurveTo of (float * float * float * float)
+    | Rect of (float * float * float * float)
+    | Restore
     | Rotate of float
     | Save
-    | Translate of (float * float)
-    | Restore
-    | Fill
-    | Rect of (float * float * float * float)
-    | FillStyle of U3<string,Browser.CanvasGradient,Browser.CanvasPattern>
-    | Batch of DrawOp list
+    | Scale of (float * float)
+    | SetLineDash of ResizeArray<float>
+    | SetTransform of (float * float * float * float * float * float)
     | Stroke
-    | ClearRect of (float * float * float * float)
-    | FillRect of (float * float * float * float)
-    | StrokeStyle of U3<string,Browser.CanvasGradient,Browser.CanvasPattern>
+    | StrokeRect of (float * float * float * float)
+    | StrokeText of (string * float * float * float)
+    | Transform of (float * float * float * float * float * float)
+    | Translate of (float * float)
+    | Batch of DrawOp list
 
 let rec drawOps (ctx : Browser.CanvasRenderingContext2D) (ops : DrawOp list) =
     for op in ops do
         match op with
-        | Rect opts -> ctx.rect opts
-        | Stroke -> ctx.stroke()
-        | Batch ops -> drawOps ctx ops
-        | LineTo opts -> ctx.lineTo opts
-        | MoveTo opts -> ctx.moveTo opts
+        | FillStyle opts -> ctx.fillStyle <- opts
+        | Font opts -> ctx.font <- opts
+        | GlobalAlpha opts -> ctx.globalAlpha <- opts
+        | GlobalCompositeOperation opts -> ctx.globalCompositeOperation <- opts
+        | LineCap opts -> ctx.lineCap <- opts
+        | LineDashOffset opts -> ctx.lineDashOffset <- opts
+        | LineJoin opts -> ctx.lineJoin <- opts
+        | LineWidth opts -> ctx.lineWidth <- opts
+        | MiterLimit opts -> ctx.miterLimit <- opts
+        | MsFillRule opts -> ctx.msFillRule <- opts
+        | MsImageSmoothingEnabled opts -> ctx.msImageSmoothingEnabled <- opts
+        | ShadowBlur opts -> ctx.shadowBlur <- opts
+        | ShadowColor opts -> ctx.shadowColor <- opts
+        | ShadowOffsetX opts -> ctx.shadowOffsetX <- opts
+        | ShadowOffsetY opts -> ctx.shadowOffsetY <- opts
+        | StrokeStyle opts -> ctx.strokeStyle <- opts
+        | TextAlign opts -> ctx.textAlign <- opts
+        | TextBaseline opts -> ctx.textBaseline <- opts
+        | Arc (x, y, radius, startAngle, endAngle, anticlockwise) -> ctx.arc(x, y, radius, startAngle, endAngle, anticlockwise)
+        | ArcTo opts -> ctx.arcTo opts
         | BeginPath -> ctx.beginPath()
-        | Scale opts -> ctx.scale opts
+        | BezierCurveTo opts -> ctx.bezierCurveTo opts
+        | ClearRect opts -> ctx.clearRect opts
+        | Clip opts -> ctx.clip opts
+        | ClosePath -> ctx.closePath()
+        // | CreateImageData opts -> ctx.createImageData opts
+        // | CreateLinearGradient opts -> ctx.createLinearGradient opts
+        // | CreatePattern opts -> ctx.createPattern opts
+        // | CreateRadialGradient opts -> ctx.createRadialGradient opts
+        // | DrawImage opts -> ctx.drawImage opts
+        | Fill -> ctx.fill()
+        | FillRect opts -> ctx.fillRect opts
+        | FillText builder ->
+            ctx.fillText(
+                builder.Text,
+                builder.X,
+                builder.Y,
+                maxWidth= defaultArg builder.MaxWidth JS.undefined
+            )
+        // | GetImageData opts -> ctx.getImageData opts
+        // | GetLineDas opts -> ctx.getLineDas opts
+        // | IsPointInPath opts -> ctx.isPointInPath opts
+        | LineTo opts -> ctx.lineTo opts
+        // | MeasureText opts -> ctx.measureText opts
+        | MoveTo opts -> ctx.moveTo opts
+        // | PutImageData opts -> ctx.putImageData opts
+        | QuadraticCurveTo opts -> ctx.quadraticCurveTo opts
+        | Rect opts -> ctx.rect opts
+        | Restore -> ctx.restore()
         | Rotate opts -> ctx.rotate opts
         | Save -> ctx.save()
+        | Scale opts -> ctx.scale opts
+        | SetLineDash opts -> ctx.setLineDash opts
+        | SetTransform opts -> ctx.setTransform opts
+        | Stroke -> ctx.stroke()
+        | StrokeRect opts -> ctx.strokeRect opts
+        // | StrokeText opts -> ctx.strokeText opts
+        | Transform opts -> ctx.transform opts
         | Translate opts -> ctx.translate opts
-        | Restore -> ctx.restore()
-        | Fill -> ctx.fill()
-        | FillStyle opts -> ctx.fillStyle <- opts
-        | ClearRect opts -> ctx.clearRect opts
-        | FillRect opts -> ctx.fillRect opts
-        | StrokeStyle opts -> ctx.strokeStyle <- opts
+        | Batch ops -> drawOps ctx ops
+        | x -> Browser.console.warn(sprintf "Operation %A isn't supported yet" x)
 
 type private Props =
     | Height of float
