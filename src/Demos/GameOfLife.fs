@@ -51,6 +51,7 @@ module Demo =
     module Const =
         let [<Literal>] GRID_SIZE = 30
         let [<Literal>] MAX_FPS = 10.
+        let [<Literal>] HEADER_HEIGHT = 60.
         let [<Literal>] ALIVE = 1
         let [<Literal>] DEAD = 0
 
@@ -255,18 +256,39 @@ module Demo =
         | UpdateCanvasSize (width, height) ->
             { model with CanvasWidth = width
                          CanvasHeight = height
-                         CellWidth = width / float Const.GRID_SIZE }, Cmd.none
+                         CellWidth = (height - Const.HEADER_HEIGHT) / float Const.GRID_SIZE }, Cmd.none
         (* end-hide *)
 
     (**
 #### Views
     *)
-    let drawCell (x : int) (y : int) (width : float) (height : float) =
+
+    let private drawUI (model : Model) =
+        let text =
+            if model.IsRunning then
+                "Playing"
+            else
+                "Paused"
+        [ Canvas.Save
+          Canvas.Translate (0., canvasRef.height - Const.HEADER_HEIGHT)
+          Canvas.FillStyle !^"#222222"
+          Canvas.FillRect (model.CanvasWidth - 90., 0., 90., 21.)
+          Canvas.FillStyle !^"rgb(170, 245, 163)"
+          Canvas.TextBaseline "bottom"
+          Canvas.Font "20px Georgia"
+          Canvas.FillText
+            (Canvas.FillTextBuilder.create text
+                |> Canvas.FillTextBuilder.withX (model.CanvasWidth - 75.)
+                |> Canvas.FillTextBuilder.withY 21.)
+          Canvas.Restore
+        ] |> Canvas.Batch
+
+    let private drawCell (x : int) (y : int) (width : float) (height : float) =
         [ Canvas.FillStyle !^"green"
           Canvas.FillRect (float x * width , float y * height, width, height) ]
         |> Canvas.Batch
 
-    let drawWorld (model : Model) =
+    let private drawWorld (model : Model) =
         let ySize = model.World.Length
         let xSize = model.World.[0].Length
 
@@ -290,7 +312,9 @@ module Demo =
 
                 x <- x + model.CellWidth
 
-              while y < canvasRef.height do
+              // We add one to be sure to draw the last line
+              // The line just before the UI section
+              while y <= canvasRef.height - Const.HEADER_HEIGHT + 1. do
                 yield Canvas.BeginPath
                 yield Canvas.MoveTo (0., y)
                 yield Canvas.LineTo (canvasRef.width, y)
@@ -305,29 +329,13 @@ module Demo =
           grid
         ] |> Canvas.Batch
 
-    let paused (model : Model) =
-        let text =
-            if model.IsRunning then
-                "Playing"
-            else
-                "Paused"
-        [ Canvas.FillStyle !^"#222222"
-          Canvas.FillRect (model.CanvasWidth - 90., 0., 90., 21.)
-          Canvas.FillStyle !^"rgb(170, 245, 163)"
-          Canvas.TextBaseline "bottom"
-          Canvas.Font "20px Georgia"
-          Canvas.FillText
-            (Canvas.FillTextBuilder.create text
-                |> Canvas.FillTextBuilder.withX (model.CanvasWidth - 75.)
-                |> Canvas.FillTextBuilder.withY 21.)
-        ] |> Canvas.Batch
 
     let private renderCanvas (model : Model) width dispatch =
         [ Canvas.ClearRect (0., 0., model.CanvasWidth, model.CanvasHeight)
           Canvas.FillStyle !^"lightgrey"
           Canvas.FillRect (0., 0., model.CanvasWidth, model.CanvasHeight)
           drawWorld model
-          paused model]
+          drawUI model]
 
     open Fable.Helpers.React
     open Fable.Helpers.React.Props
