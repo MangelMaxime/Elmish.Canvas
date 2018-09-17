@@ -27,7 +27,7 @@ class Canvas extends React.Component {
         let delta = timestamp - this.lastFrameTimeMs;
         this.lastFrameTimeMs = timestamp;
         const timestep = 1000/this.props.maxFPS;
-        console.log("onFrame", this.frameId, " | Steps: ", delta / timestep );
+        // console.log("onFrame", this.frameId, " | Steps: ", delta / timestep );
 
         while (delta >= timestep) {
             this.props.onTick([timestep, 10.]);
@@ -49,7 +49,7 @@ class Canvas extends React.Component {
             // this.props.onTick();
         // }
         // drawOps(this.getContext(), this.props.drawOps);
-        console.log("DidUpdate", this.frameId);
+        // console.log("DidUpdate", this.frameId);
         drawOps(this.getContext(), this.props.drawOps);
         // console.log("DidUpdate:", performance.now());
         requestAnimationFrame(this.onFrame);

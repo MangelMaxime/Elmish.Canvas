@@ -335,7 +335,7 @@ module Demo =
           Canvas.FillStyle !^"lightgrey"
           Canvas.FillRect (0., 0., model.CanvasWidth, model.CanvasHeight)
           drawWorld model
-          drawUI model]
+          drawUI model ]
 
     open Fable.Helpers.React
     open Fable.Helpers.React.Props

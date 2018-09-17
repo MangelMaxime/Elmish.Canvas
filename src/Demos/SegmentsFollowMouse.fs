@@ -2,6 +2,63 @@
 module Demos.SegmentsFollowMouse
 (* end-hide *)
 
+module Canvas =
+
+    open Fable.Core
+    open Fable.Core.JsInterop
+    open Fable.Import
+    open Fable.Helpers.React
+    open Fable.Helpers.React.Props
+
+    [<Pojo>]
+    type Props<'Model, 'Msg> =
+        { OnMount : unit -> unit
+          OnUnmount: unit -> unit
+          Height : float
+          Width : float
+          Props : IHTMLProp list
+          Renderer : Browser.CanvasRenderingContext2D -> unit }
+
+
+    let initialProps : Props<'Model, 'Msg> =
+        { OnMount = ignore
+          OnUnmount = ignore
+          Height = 300.
+          Width = 150.
+          Props = [ ]
+          Renderer = fun _ -> () }
+
+    [<Pojo>]
+    type State = obj
+
+    type CanvasComponents<'Model, 'Msg>(props) =
+        inherit React.Component<Props<'Model, 'Msg>, State>(props)
+        do base.setInitState(null)
+
+        member this.canvasRef with get () = unbox<Browser.HTMLCanvasElement> this?refs?canvas
+
+        override __.componentWillUnmount () =
+            props.OnUnmount ()
+
+        override __.componentDidMount () =
+            props.OnMount ()
+
+        override this.componentDidUpdate (_prevProps, _prevState) =
+            this.props.Renderer(this.canvasRef.getContext_2d())
+
+        override this.render () =
+            let props =
+                [ HTMLAttr.Width this.props.Width :> IHTMLProp
+                  HTMLAttr.Height this.props.Height :> IHTMLProp
+                  HTMLAttr.Custom("ref", "canvas") :> IHTMLProp ]
+                @ this.props.Props
+
+            canvas props
+                [ ]
+
+    let view props =
+        ofType<CanvasComponents<'Model, 'Msg>,_,_> props [ ]
+
 (**
 ### Particle module
 
@@ -13,6 +70,7 @@ module Particle =
 (* hide *)
     open System
     open Fable.Core
+    open Fable.Import
 
 (* end-hide *)
 
@@ -104,25 +162,24 @@ In the update function, we handle the "pysics" of our particles
     (**
 We describe the actions needed for drawing a particle on the canvas
     *)
-    let draw (particle : Particle) (total : int) (width : float) =
+    let draw (ctx : Browser.CanvasRenderingContext2D) (particle : Particle) (total : int) (width : float) =
         let angle = Math.Atan2(particle.Dy, particle.Dx)
         let scale = Math.Cos(Math.PI / 2. * (float particle.Id / float total))
 
-        [ Canvas.Save
-          Canvas.Translate (particle.X, particle.Y)
-          Canvas.Rotate angle
-          Canvas.Scale (scale, scale)
+        ctx.save()
+        ctx.translate(particle.X, particle.Y)
+        ctx.rotate(angle)
+        ctx.scale(scale, scale)
 
-          Canvas.BeginPath
-          Canvas.MoveTo (-width / 2. * 1.732, -width / 2.)
-          Canvas.LineTo(0. ,0.)
-          Canvas.LineTo(-width / 2. * 1.732, width / 2.)
-          Canvas.LineTo(-width / 2. * 1.2, 0.)
-          Canvas.FillStyle (U3.Case1 "white")
-          Canvas.Fill
+        ctx.beginPath()
+        ctx.moveTo(-width / 2. * 1.732, -width / 2.)
+        ctx.lineTo(0. ,0.)
+        ctx.lineTo(-width / 2. * 1.732, width / 2.)
+        ctx.lineTo(-width / 2. * 1.2, 0.)
+        ctx.fillStyle <- U3.Case1 "white"
+        ctx.fill()
 
-          Canvas.Restore
-        ] |> Canvas.Batch
+        ctx.restore()
 
 (**
 ### Elmish component
@@ -135,6 +192,7 @@ module Demo =
     open Fable.PowerPack
     open Fable.Import
     open Fable.Core.JsInterop
+    open Fable.Helpers.React.Props
 
     (**
 #### Model
@@ -155,14 +213,15 @@ module Demo =
           /// We use array because they are smaller in memory
           Particles : Particle.Particle array
           Settings : Settings
-          MousePosition : Position }
+          MousePosition : Position
+          LastFrameTimeMs : float }
 
     (**
 #### Msg
     *)
     type Msg =
         /// The tick message is trigger at 60fps, and is responsible for the animation trigger
-        | Tick
+        | Tick of float
         /// Event triggered when Mouse move over the canvas
         | MouseMove of Position
         (* hide *)
@@ -184,7 +243,17 @@ module Demo =
           Settings = settings
           MousePosition =
             { X = 0.
-              Y = 0. } }, Cmd.ofMsg Tick
+              Y = 0. }
+          LastFrameTimeMs = 0. }, Cmd.ofMsg (Tick 0.)
+
+    module Cmd =
+
+        let onAnimationFrame (messageCtor : float -> 'Msg) =
+            let handler dispatch =
+                Browser.window.requestAnimationFrame(fun timestamp ->
+                    messageCtor timestamp |> dispatch
+                ) |> ignore
+            [ handler ]
 
     (**
 #### Update function
@@ -192,20 +261,24 @@ module Demo =
     let update msg model =
         match msg with
         // Update the animation
-        | Tick ->
-            // Update all particles positions
-            let particles =
-                model.Particles
-                |> Array.map (fun particle ->
-                    let settings : Particle.Settings =
-                        { Width = model.Settings.CanvasWidth
-                          Height = model.Settings.CanvasHeight
-                          FollowSpeed = model.Settings.FollowSpeed
-                          MousePos = model.MousePosition }
-                    Particle.update particle model.Particles settings
-                )
+        | Tick timestamp ->
+            if timestamp < model.LastFrameTimeMs + (1000. / 30.) then
+                model, Cmd.onAnimationFrame Tick
+            else
+                // Update all particles positions
+                let particles =
+                    model.Particles
+                    |> Array.map (fun particle ->
+                        let settings : Particle.Settings =
+                            { Width = model.Settings.CanvasWidth
+                              Height = model.Settings.CanvasHeight
+                              FollowSpeed = model.Settings.FollowSpeed
+                              MousePos = model.MousePosition }
+                        Particle.update particle model.Particles settings
+                    )
 
-            { model with Particles = particles }, Cmd.none
+                { model with Particles = particles
+                             LastFrameTimeMs = timestamp }, Cmd.onAnimationFrame Tick
 
         // Update the mouse position
         | MouseMove newPosition ->
@@ -241,29 +314,27 @@ module Demo =
     (**
 #### Views
     *)
-    let private drawParticles (model : Model) width  =
-        [ for particle in model.Particles do
-            yield Particle.draw particle model.Particles.Length width ]
-        |> Canvas.Batch
+    let renderer (model : Model) (ctx : Browser.CanvasRenderingContext2D) =
+        // Clear previous frame
+        ctx.clearRect(0., 0., model.Settings.CanvasWidth, model.Settings.CanvasHeight)
+        // Draw the particles
+        for particle in model.Particles do
+            Particle.draw ctx particle model.Particles.Length (float model.Settings.Size)
 
-    let view (model : Model) width dispatch =
-        let size : Canvas.Size =
-            { Width = model.Settings.CanvasWidth
-              Height = model.Settings.CanvasHeight }
-
-        size
-        |> Canvas.initialize
-        |> Canvas.onTick (fun _ -> dispatch Tick)
-        |> Canvas.onMouseMove (fun ev ->
-            let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
-            { X = ev.clientX - bounds.left
-              Y = ev.clientY - bounds.top }
-            |> MouseMove
-            |> dispatch
-        )
-        |> Canvas.draw (Canvas.ClearRect (0., 0., model.Settings.CanvasWidth, model.Settings.CanvasHeight))
-        |> Canvas.draw (drawParticles model width )
-        |> Canvas.render
+    let view (model : Model) dispatch =
+        Canvas.view
+            { Canvas.initialProps
+                with Width = model.Settings.CanvasWidth
+                     Height = model.Settings.CanvasHeight
+                     Props =
+                        [ OnMouseMove (fun ev ->
+                            let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
+                            { X = ev.clientX - bounds.left
+                              Y = ev.clientY - bounds.top }
+                            |> MouseMove
+                            |> dispatch
+                        ) ]
+                     Renderer = renderer model }
 
 (* hide *)
 /////////////////////////////////////////////////////////////////////
@@ -438,7 +509,7 @@ let view (model : Model) dispatch =
                                                  ReactResizeDetector.OnResize (fun width height ->
                                                     dispatch (OnResize (width, height))
                                                 ) ] [ ]
-                  Demo.view model.Demo (float model.Inputs.Size) (DemoMsg >> dispatch) ] ]
+                  Demo.view model.Demo (DemoMsg >> dispatch) ] ]
           div [ Style [ MaxWidth "800px"
                         Margin "auto" ] ]
             [ Elmish.React.Common.lazyView Helpers.View.literateCode (__SOURCE_DIRECTORY__ + "/" + __SOURCE_FILE__) ] ]
