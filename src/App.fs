@@ -1,181 +1,182 @@
 module App
 
-open Elmish
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
-open Fulma
-open Fulma.FontAwesome
+type Position =
+    { X : float
+      Y : float }
+
+    static member Empty =
+        { X = 0.
+          Y = 0. }
+
+[<RequireQualifiedAccess>]
+module Particle =
+
+(* hide *)
+    open System
+    open Fable.Core
+    open Fable.Import
+
+(* end-hide *)
+
+    (**
+We create a record to store all the information about the particle:
+    *)
+    type Particle =
+        { /// X coordinate
+          X : float
+          /// Y coordinate
+          Y : float
+          /// Unique Id, it's index based so we can find the previous particle
+          Id : int
+          /// Force applied, to the X coordinate
+          Dx : float
+          /// Force applied, to the Y coordiate
+          Dy : float
+          AngleX : float
+          AngleY : float
+          SpeedX : float
+          SpeedY : float
+          Radius : float }
+
+    (**
+When creating a particle, we use random values. This allow us to have a nice animation for waiting mouse events.
+    *)
+
+    let private rand = new Random()
+
+    let create index : Particle =
+        { X = -50.
+          Y = -50.
+          Dx = 0.
+          Dy = 0.
+          Id = index + 1
+          AngleX = Math.PI * 2. * rand.NextDouble()
+          AngleY = Math.PI * 2. * rand.NextDouble()
+          SpeedX = 0.03 * rand.NextDouble() + 0.03
+          SpeedY = 0.03 * rand.NextDouble() + 0.03
+          Radius = 150. }
+
+    (**
+We use a record for the settings, this simply the `update` signature. And allow us to easily add new settings to the demo.
+    *)
+    type Settings =
+        { Width : float
+          Height : float
+          FollowSpeed : float
+          MousePos : Position }
+
+    (**
+In the update function, we handle the "pysics" of our particles
+    *)
+    let update (particle : Particle) (particles : Particle array) (settings : Settings) =
+        // If this is not the first particle, then it follows the previous particle
+        if particle.Id > 1 then
+            // Target we are aiming at
+            let aim = particles.[particle.Id - 1 - 1]
+            let dx = aim.X - particle.X
+            let dy = aim.Y - particle.Y
+
+            { particle with X = particle.X + dx * settings.FollowSpeed
+                            Y = particle.Y + dy * settings.FollowSpeed
+                            Dx = dx
+                            Dy = dy }
+        else
+            // If the mouse never moved, then create random mouvements
+            if settings.MousePos.X = 0. && settings.MousePos.Y = 0. then
+                let dx = settings.Width / 2. + Math.Cos(particle.AngleX) * particle.Radius - particle.X
+                let dy = settings.Height / 2. + Math.Sin(particle.AngleY) * particle.Radius - particle.Y
+
+                { particle with X = settings.Width / 2. + Math.Cos(particle.AngleX) * particle.Radius
+                                Y = settings.Height / 2. + Math.Sin(particle.AngleY) * particle.Radius
+                                AngleX = particle.AngleX + particle.SpeedX
+                                AngleY = particle.AngleY + particle.SpeedY
+                                Dx = dx
+                                Dy = dy }
+
+            else
+                // Follow the mouse
+                let dx = settings.MousePos.X - particle.X
+                let dy = settings.MousePos.Y - particle.Y
+
+                { particle with X = particle.X + dx * settings.FollowSpeed
+                                Y = particle.Y + dy * settings.FollowSpeed
+                                Dx = dx
+                                Dy = dy }
+
+    (**
+We describe the actions needed for drawing a particle on the canvas
+    *)
+    let draw (ctx : Browser.CanvasRenderingContext2D) (particle : Particle) (total : int) (width : float) =
+        let angle = Math.Atan2(particle.Dy, particle.Dx)
+        let scale = Math.Cos(Math.PI / 2. * (float particle.Id / float total))
+
+        ctx.save()
+        ctx.translate(particle.X, particle.Y)
+        ctx.rotate(angle)
+        ctx.scale(scale, scale)
+
+        ctx.beginPath()
+        ctx.moveTo(-width / 2. * 1.732, -width / 2.)
+        ctx.lineTo(0. ,0.)
+        ctx.lineTo(-width / 2. * 1.732, width / 2.)
+        ctx.lineTo(-width / 2. * 1.2, 0.)
+        ctx.fillStyle <- U3.Case1 "white"
+        ctx.fill()
+
+        ctx.restore()
+
+let mutable particles : Particle.Particle array =
+    [|
+        for index = 0 to 16 do
+            yield Particle.create index
+    |]
+
 open Fable.Import
+open Fable.Core.JsInterop
 
-type Demo =
-    | SegmentsFollowMouse of Demos.SegmentsFollowMouse.Model
-    | MovingBox of Demos.MovingBox.Model
-    | GameOfLife of Demos.GameOfLife.Model
+let canvas = Browser.document.getElementById "app" :?> Browser.HTMLCanvasElement
+let context = canvas.getContext_2d()
 
-type Page =
-    | Home
-    | Demo of Demo
+canvas.width <- Browser.window.innerWidth
+canvas.height <- Browser.window.innerHeight
 
-type Model =
-    { CurrentRoute : Router.Route
-      CurrentPage : Page }
+let runner = Canvas.Runner()
 
-type Msg =
-    | SegmentsFollowMouseMsg of Demos.SegmentsFollowMouse.Msg
-    | MovingBoxMsg of Demos.MovingBox.Msg
-    | GameOfLifeMsg of Demos.GameOfLife.Msg
+let ``begin`` timestamp frameDelta = ()
 
-let urlUpdate (result : Option<Router.Route>) model =
-    match result with
-    | None ->
-        Browser.console.error("Error parsing url: " + Browser.window.location.href)
-        model, Router.modifyUrl model.CurrentRoute
+let update simulationTimestep =
+    particles <-
+        particles
+        |> Array.map (fun particle ->
+            let settings : Particle.Settings =
+                { Width = canvas.width
+                  Height = canvas.height
+                  FollowSpeed = 0.1
+                  MousePos =
+                    { X = 0.
+                      Y = 0. } }
+            Particle.update particle particles settings
+        )
 
-    | Some page ->
-        let model = { model with CurrentRoute = page }
-        match page with
-        | Router.Home ->
-            model, Cmd.none
+let draw simulationTimestep =
+    context.clearRect(0., 0., canvas.width, canvas.height)
+    // Draw the particles
+    for particle in particles do
+        Particle.draw context particle particles.Length 25.
 
-        | Router.Demo Router.DemoRoute.SegmentsFollowMouse ->
-            let (subModel, subCmd) = Demos.SegmentsFollowMouse.init ()
-            { model with CurrentPage =
-                                subModel
-                                |> Demo.SegmentsFollowMouse
-                                |> Page.Demo }, Cmd.map SegmentsFollowMouseMsg subCmd
+let ``end`` fps panic =
+    context.save()
+    context.fillStyle <- !^"black"
+    context.font <- "20px Arial, sans-serif"
+    context.fillText(string (JS.Math.round(fps)) + " FPS", 0., 20.)
+    context.restore()
+    // Display FPS
+    if panic then
+        let discardedTime = runner.ResetFrameDelta()
+        Browser.console.warn("Runner panicked, probably because the browser tab was put in the background. Discarding " + string discardedTime + "ms");
 
-        | Router.Demo Router.DemoRoute.MovingBox ->
-            let (subModel, subCmd) = Demos.MovingBox.init ()
-            { model with CurrentPage =
-                                subModel
-                                |> Demo.MovingBox
-                                |> Page.Demo }, Cmd.map MovingBoxMsg subCmd
-
-        | Router.Demo Router.DemoRoute.GameOfLife ->
-            let (subModel, subCmd) = Demos.GameOfLife.init ()
-            { model with CurrentPage =
-                                subModel
-                                |> Demo.GameOfLife
-                                |> Page.Demo }, Cmd.map GameOfLifeMsg subCmd
-
-let init result =
-    urlUpdate result { CurrentRoute = Router.Route.Home
-                       CurrentPage = Home }
-
-let private update msg model =
-    match msg with
-    | SegmentsFollowMouseMsg subMsg ->
-        match model with
-        | { CurrentPage = Page.Demo (Demo.SegmentsFollowMouse subModel) } ->
-            let (newModel, newCmd) = Demos.SegmentsFollowMouse.update subMsg subModel
-            { model with CurrentPage =
-                            newModel
-                            |> Demo.SegmentsFollowMouse
-                            |> Page.Demo } , Cmd.map SegmentsFollowMouseMsg newCmd
-        | _ ->
-            model, Cmd.none
-
-    | MovingBoxMsg subMsg ->
-        match model with
-        | { CurrentPage = Page.Demo (Demo.MovingBox subModel) } ->
-            let (newModel, newCmd) = Demos.MovingBox.update subMsg subModel
-            { model with CurrentPage =
-                            newModel
-                            |> Demo.MovingBox
-                            |> Page.Demo } , Cmd.map MovingBoxMsg newCmd
-        | _ ->
-            model, Cmd.none
-
-    | GameOfLifeMsg subMsg ->
-        // On page change if the widget isn't the activeone, allow the component to reset it's state ???
-        match model with
-        | { CurrentPage = Page.Demo (Demo.GameOfLife subModel) } ->
-            let (newModel, newCmd) = Demos.GameOfLife.update subMsg subModel
-            { model with CurrentPage =
-                            newModel
-                            |> Demo.GameOfLife
-                            |> Page.Demo } , Cmd.map GameOfLifeMsg newCmd
-        | _ ->
-            model, Cmd.none
-
-let private navbar =
-    Navbar.navbar [ Navbar.IsFixedTop
-                    Navbar.Color IsLink ]
-        [ Navbar.Brand.div [ ]
-            [ Navbar.Item.div [ ]
-                [ Heading.h4 [ Heading.Props [ Style [ Color "white" ] ] ]
-                    [ str "Elmish canvas (demos)" ] ] ] ]
-
-// Helper to generate a menu item
-let menuItem label isActive route =
-    Menu.Item.li [ Menu.Item.IsActive isActive
-                   Menu.Item.Props [ Router.href route ] ]
-       [ str label ]
-
-// Helper to generate a sub menu
-let subMenu label isActive children =
-    li [ ]
-       [ Menu.Item.a [ Menu.Item.IsActive isActive ]
-            [ str label ]
-         ul [ ] children ]
-
-let menu =
-    Card.card [ ]
-        [ Card.header [ ]
-            [ Card.Header.title [ ]
-                [ Icon.faIcon [ ]
-                    [ Fa.icon Fa.I.Laptop
-                      Fa.faLg ]
-                  str "Samples" ] ]
-          Card.content [ ]
-            [ // Menu rendering
-              Menu.menu [ ]
-                [ Menu.list [ ]
-                    [ menuItem "Segments follow mouse" false (Router.Demo Router.DemoRoute.SegmentsFollowMouse)
-                      menuItem "Moving box" false (Router.Demo Router.DemoRoute.MovingBox)
-                      menuItem "Game of Life" false (Router.Demo Router.DemoRoute.GameOfLife) ] ] ] ]
-
-let about =
-    Card.card [ ]
-        [ Card.header [ ]
-            [ Card.Header.title [ ]
-                [ Icon.faIcon [ ]
-                    [ Fa.icon Fa.I.Info
-                      Fa.faLg ]
-                  str "About" ] ]
-          Card.content [ ]
-            [ a [ ]
-                [ Text.span [ Modifiers [ Modifier.TextTransform TextTransform.Italic] ]
-                    [ str "Found a bug ?" ] ] ] ]
-
-let private view model dispatch =
-    let content =
-        match model.CurrentPage with
-        | Page.Demo (Demo.SegmentsFollowMouse subModel) ->
-            Demos.SegmentsFollowMouse.view subModel (SegmentsFollowMouseMsg >> dispatch)
-        | Page.Demo (Demo.MovingBox subModel) ->
-            Demos.MovingBox.view subModel (MovingBoxMsg >> dispatch)
-        | Page.Demo (Demo.GameOfLife subModel) ->
-            Demos.GameOfLife.view subModel (GameOfLifeMsg >> dispatch)
-        | Page.Home ->
-            str "home"
-
-    div [ ]
-        [ navbar
-          div [ Class "page-content" ]
-            [ div [ Class "sidebar" ]
-                [ menu
-                  about
-                  div [ Style [ Flex "1 1 0"] ]
-                    [ ] ]
-              div [ Class "main-content" ]
-                [ content ] ] ]
-
-open Elmish.React
-open Elmish.Browser.Navigation
-open Elmish.Browser.UrlParser
-
-Program.mkProgram init update view
-|> Program.toNavigable (parseHash Router.pageParser) urlUpdate
-|> Program.withReactUnoptimized "elmish-app"
-|> Program.run
+runner.Begin <- ``begin``
+runner.Update <- update
+runner.Draw <- draw
+runner.End <- ``end``
+runner.Start()

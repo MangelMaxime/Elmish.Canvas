@@ -1,49 +1,7 @@
-$fa-font-path: "./../../node_modules/font-awesome/fonts/";
-@import './../../node_modules/font-awesome/scss/font-awesome.scss';
-
-@import './_variables';
-@import './../../node_modules/bulma/bulma.sass';
-@import './../../node_modules/bulma-slider/dist/css/bulma-slider.sass';
-@import './../../node_modules/highlight.js/styles/default.css';
-
-canvas {
+html, body {
+    height: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
     background: radial-gradient(#00d2ff, #3a7bd5);
-}
-
-.page-content {
-    height: calc(100vh - #{$navbar-height});
-    width: 100%;
-    display: flex;
-
-    .sidebar {
-        display: flex;
-        flex-direction: column;
-        flex: none;
-        width: 300px;
-    }
-
-    .main-content {
-        width: 100%;
-        height: calc(100vh - #{$navbar-height});
-        overflow-y: auto;
-    }
-}
-
-.card .card-header .card-header-title .icon {
-    margin-right: 0.5em;
-}
-
-.demo {
-    width: 100%;
-    max-width: 800px;
-    margin: auto;
-
-    canvas {
-        height: 600px;
-    }
-
-    .settings-row {
-        display: flex;
-        justify-content: space-around;
-    }
 }

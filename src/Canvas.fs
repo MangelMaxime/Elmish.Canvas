@@ -2,220 +2,209 @@ module Canvas
 
 open Fable.Core
 open Fable.Import
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
-open Elmish
 
-module JS =
+// The runner class is a port of https://github.com/IceCreamYou/MainLoop.js/
+// The following license has been copied from MainLoop.js repo
+// Source: https://github.com/IceCreamYou/MainLoop.js/blob/gh-pages/LICENSE.txt
 
-    [<Emit("undefined")>]
-    let inline undefined<'a> : 'a = jsNative
+// The MIT License
 
-module FillTextBuilder =
+// Copyright (C) 2016 Isaac Sukin
 
-    type FillTextBuilder =
-        { Text : string
-          X : float
-          Y : float
-          MaxWidth: float option }
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
 
-    let create text =
-        { Text = text
-          X = 0.
-          Y = 0.
-          MaxWidth = None }
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 
-    let withX x (builder : FillTextBuilder) =
-        { builder with X = x }
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-    let withY y (builder : FillTextBuilder) =
-        { builder with Y = y }
+type Runner() =
+    /// The amount of time (in milliseconds) to simulate each time update()
+    /// runs. See `MainLoop.setSimulationTimestep()` for details.
+    let mutable simulationTimestep = 1000. / 60.
 
-    let withMaxWidth width (builder : FillTextBuilder) =
-        { builder with MaxWidth = Some width }
+    /// The cumulative amount of in-app time that hasn't been simulated yet.
+    /// See the comments inside animate() for details.
+    let mutable frameDelta = 0.
 
-type DrawOp =
-    | FillStyle of U3<string, Browser.CanvasGradient, Browser.CanvasPattern>
-    | Font of string
-    | GlobalAlpha of float
-    | GlobalCompositeOperation of string
-    | LineCap of string
-    | LineDashOffset of float
-    | LineJoin of string
-    | LineWidth of float
-    | MiterLimit of float
-    | MsFillRule of string
-    | MsImageSmoothingEnabled of bool
-    | ShadowBlur of float
-    | ShadowColor of string
-    | ShadowOffsetX of float
-    | ShadowOffsetY of float
-    | StrokeStyle of U3<string, Browser.CanvasGradient, Browser.CanvasPattern>
-    | TextAlign of string
-    | TextBaseline of string
-    | Arc of (float * float * float * float * float * bool)
-    | ArcTo of (float * float * float * float * float)
-    | BeginPath
-    | BezierCurveTo of (float * float * float * float * float * float)
-    | ClearRect of (float * float * float * float)
-    | Clip of string
-    | ClosePath
-    | CreateImageData of U2<float, Browser.ImageData> * float
-    // | CreateLinearGradient of float * float * float * float -> CanvasGradient
-    // | CreatePattern of U3<HTMLImageElement, HTMLCanvasElement, HTMLVideoElement> * string -> CanvasPattern
-    // | CreateRadialGradient of float * float * float * float * float * float -> CanvasGradient
-    | DrawImage of (U3<Browser.HTMLImageElement, Browser.HTMLCanvasElement, Browser.HTMLVideoElement> * float * float * float * float * float * float * float * float)
-    | Fill
-    | FillRect of (float * float * float * float)
-    | FillText of FillTextBuilder.FillTextBuilder
-    // | GetImageData of float * float * float * float -> ImageData
-    // | GetLineDash
-    // | IsPointInPath of float * float * string -> bool
-    | LineTo of (float * float)
-    // | MeasureText of string -> Browser.TextMetrics
-    | MoveTo of (float * float)
-    | PutImageData of (Browser.ImageData * float * float * float * float * float * float)
-    | QuadraticCurveTo of (float * float * float * float)
-    | Rect of (float * float * float * float)
-    | Restore
-    | Rotate of float
-    | Save
-    | Scale of (float * float)
-    | SetLineDash of ResizeArray<float>
-    | SetTransform of (float * float * float * float * float * float)
-    | Stroke
-    | StrokeRect of (float * float * float * float)
-    | StrokeText of (string * float * float * float)
-    | Transform of (float * float * float * float * float * float)
-    | Translate of (float * float)
-    | Batch of DrawOp list
+    /// The timestamp in milliseconds of the last time the main loop was run.
+    /// Used to compute the time elapsed between frames.
+    let mutable lastFrameTimeMs = 0.
 
-let rec drawOps (ctx : Browser.CanvasRenderingContext2D) (ops : DrawOp list) =
-    for op in ops do
-        match op with
-        | FillStyle opts -> ctx.fillStyle <- opts
-        | Font opts -> ctx.font <- opts
-        | GlobalAlpha opts -> ctx.globalAlpha <- opts
-        | GlobalCompositeOperation opts -> ctx.globalCompositeOperation <- opts
-        | LineCap opts -> ctx.lineCap <- opts
-        | LineDashOffset opts -> ctx.lineDashOffset <- opts
-        | LineJoin opts -> ctx.lineJoin <- opts
-        | LineWidth opts -> ctx.lineWidth <- opts
-        | MiterLimit opts -> ctx.miterLimit <- opts
-        | MsFillRule opts -> ctx.msFillRule <- opts
-        | MsImageSmoothingEnabled opts -> ctx.msImageSmoothingEnabled <- opts
-        | ShadowBlur opts -> ctx.shadowBlur <- opts
-        | ShadowColor opts -> ctx.shadowColor <- opts
-        | ShadowOffsetX opts -> ctx.shadowOffsetX <- opts
-        | ShadowOffsetY opts -> ctx.shadowOffsetY <- opts
-        | StrokeStyle opts -> ctx.strokeStyle <- opts
-        | TextAlign opts -> ctx.textAlign <- opts
-        | TextBaseline opts -> ctx.textBaseline <- opts
-        | Arc (x, y, radius, startAngle, endAngle, anticlockwise) -> ctx.arc(x, y, radius, startAngle, endAngle, anticlockwise)
-        | ArcTo opts -> ctx.arcTo opts
-        | BeginPath -> ctx.beginPath()
-        | BezierCurveTo opts -> ctx.bezierCurveTo opts
-        | ClearRect opts -> ctx.clearRect opts
-        | Clip opts -> ctx.clip opts
-        | ClosePath -> ctx.closePath()
-        // | CreateImageData opts -> ctx.createImageData opts
-        // | CreateLinearGradient opts -> ctx.createLinearGradient opts
-        // | CreatePattern opts -> ctx.createPattern opts
-        // | CreateRadialGradient opts -> ctx.createRadialGradient opts
-        // | DrawImage opts -> ctx.drawImage opts
-        | Fill -> ctx.fill()
-        | FillRect opts -> ctx.fillRect opts
-        | FillText builder ->
-            ctx.fillText(
-                builder.Text,
-                builder.X,
-                builder.Y,
-                maxWidth= defaultArg builder.MaxWidth JS.undefined
+    /// An exponential moving average of the frames per second.
+    let mutable fps = 60.
+
+    /// A factor that affects how heavily to weight more recent seconds'
+    /// performance when calculating the average frames per second. Valid values
+    /// range from zero to one inclusive. Higher values result in weighting more
+    /// recent seconds more heavily.
+    let fpsAlpha = 0.9
+
+    /// The minimum duration between updates to the frames-per-second estimate.
+    /// Higher values increase accuracy, but result in slower updates.
+    let fpsUpdateInterval = 1000.
+
+    /// The timestamp (in milliseconds) of the last time the `fps` moving
+    /// average was updated.
+    let mutable lastFpsUpdate = 0.
+
+    /// The number of frames delivered since the last time the `fps` moving
+    /// average was updated (i.e. since `lastFpsUpdate`).
+    let mutable framesSinceLastFpsUpdate = 0
+
+    /// The number of times update() is called in a given frame. This is only
+    /// relevant inside of animate(), but a reference is held externally so that
+    /// this variable is not marked for garbage collection every time the main
+    /// loop runs.
+    let mutable numUpdateSteps = 0
+
+    /// Whether we should stop the current update simulation or no. This is only
+    /// relevant inside of animate(), but a reference is held externally so that
+    /// this variable is not marked for garbage collection every time the main
+    /// loop runs.
+    let mutable forceBreak = false
+
+    /// The minimum amount of time in milliseconds that must pass since the last
+    /// frame was executed before another frame can be executed. The
+    /// multiplicative inverse caps the FPS (the default of zero means there is
+    /// no cap).
+    let mutable minFrameDelay = 0.
+
+    /// Whether the main loop is running.
+    let mutable running = false
+
+    /// `true` if `MainLoop.start()` has been called and the most recent time it
+    /// was called has not been followed by a call to `MainLoop.stop()`. This is
+    /// different than `running` because there is a delay of a few milliseconds
+    /// after `MainLoop.start()` is called before the application is considered
+    /// "running." This delay is due to waiting for the next frame.
+    let mutable started = false
+
+    /// Whether the simulation has fallen too far behind real time.
+    /// Specifically, `panic` will be set to `true` if too many updates occur in
+    /// one frame. This is only relevant inside of animate(), but a reference is
+    /// held externally so that this variable is not marked for garbage
+    /// collection every time the main loop runs.
+    let mutable panic = false
+
+    /// A function that runs at the beginning of the main loop.
+    /// See `MainLoop.setBegin()` for details.
+    let mutable ``begin`` = fun _timestamp _frameDelta -> ()
+
+    /// A function that runs updates (i.e. AI and physics).
+    /// See `MainLoop.setUpdate()` for details.
+    let mutable update = fun _simulationTimestep -> ()
+
+    /// A function that draws things on the screen.
+    /// See `MainLoop.setDraw()` for details.
+    let mutable draw = fun _simulationTimestep -> ()
+
+    /// A function that runs at the end of the main loop.
+    /// See `MainLoop.setEnd()` for details.
+    let mutable ``end`` = fun _fps _isPanic -> ()
+
+    /// The ID of the currently executing frame. Used to cancel frames when
+    /// stopping the loop.
+    let mutable rafHandle = 0.
+
+    member __.SimulationTimestep
+        with get() = simulationTimestep
+        and set(value) = simulationTimestep <- value
+
+
+    member __.FPS
+        with get() = fps
+
+    member this.MaxAllowedFPS
+        with get() = 1000. / minFrameDelay
+        and set(value) =
+            if value = 0. then
+                this.Stop();
+            else
+                minFrameDelay <- 1000. / value
+
+    member __.ResetFrameDelta () =
+        let oldFrameDelta = frameDelta;
+        frameDelta <- 0.
+        oldFrameDelta
+
+    member __.Begin
+        with set(value) = ``begin`` <- value
+
+    member __.Update
+        with set(value) = update <- value
+
+    member __.Draw
+        with set(value) = draw <- value
+
+    member __.End
+        with set(value) = ``end`` <- value
+
+    member this.Start() =
+        if not started then
+            started <- true
+
+            rafHandle <- Browser.window.requestAnimationFrame(fun timestamp ->
+                draw(1.)
+                running <- true
+
+                lastFrameTimeMs <- timestamp
+                lastFpsUpdate <- timestamp
+                framesSinceLastFpsUpdate <- 0
+
+                // Start the main loop.
+                rafHandle <- Browser.window.requestAnimationFrame(this.Animate)
             )
-        // | GetImageData opts -> ctx.getImageData opts
-        // | GetLineDas opts -> ctx.getLineDas opts
-        // | IsPointInPath opts -> ctx.isPointInPath opts
-        | LineTo opts -> ctx.lineTo opts
-        // | MeasureText opts -> ctx.measureText opts
-        | MoveTo opts -> ctx.moveTo opts
-        // | PutImageData opts -> ctx.putImageData opts
-        | QuadraticCurveTo opts -> ctx.quadraticCurveTo opts
-        | Rect opts -> ctx.rect opts
-        | Restore -> ctx.restore()
-        | Rotate opts -> ctx.rotate opts
-        | Save -> ctx.save()
-        | Scale opts -> ctx.scale opts
-        | SetLineDash opts -> ctx.setLineDash opts
-        | SetTransform opts -> ctx.setTransform opts
-        | Stroke -> ctx.stroke()
-        | StrokeRect opts -> ctx.strokeRect opts
-        // | StrokeText opts -> ctx.strokeText opts
-        | Transform opts -> ctx.transform opts
-        | Translate opts -> ctx.translate opts
-        | Batch ops -> drawOps ctx ops
-        | x -> Browser.console.warn(sprintf "Operation %A isn't supported yet" x)
 
-type private Props =
-    | Height of float
-    | Width of float
-    | DrawOps of DrawOp array
-    | OnTick of ((float * float) -> unit)
-    | IsPlaying of bool
-    | OnMouseMove of (React.MouseEvent -> unit)
-    | Style of HTMLAttr
-    | MaxFPS of int
+    member __.Stop() =
+        running <- false
+        started <- false
+        Browser.window.cancelAnimationFrame(rafHandle)
 
-open Fable.Core.JsInterop
+    member __.IsRunning
+        with get() = running
 
-type Size =
-    { Width : float
-      Height : float }
+    member this.Animate(timestamp : float) =
+        rafHandle <- Browser.window.requestAnimationFrame(this.Animate)
 
-type CanvasBuilder =
-    { Size : Size
-      DrawOps : DrawOp list
-      IsPlaying : bool
-      OnTick : (float * float) -> unit
-      OnMouseMove : React.MouseEvent -> unit
-      Style : CSSProp list
-      MaxFPS : int }
+        if (timestamp > lastFrameTimeMs + minFrameDelay) then
+            frameDelta <- frameDelta + timestamp - lastFrameTimeMs
+            lastFrameTimeMs <- timestamp
 
-let inline private canvas (props: Props list) : React.ReactElement =
-    ofImport "default" "./js/react_canvas.js" (keyValueList CaseRules.LowerFirst props) [ ]
+            ``begin`` timestamp frameDelta
 
-let initialize (size : Size) : CanvasBuilder =
-    { Size = size
-      DrawOps = []
-      OnTick = ignore
-      IsPlaying = true
-      OnMouseMove = ignore
-      Style = []
-      MaxFPS = 30 }
+            if timestamp > lastFpsUpdate + fpsUpdateInterval then
+                fps <- fpsAlpha * float framesSinceLastFpsUpdate * 1000. / (timestamp - lastFpsUpdate) + (1. - fpsAlpha) * fps
 
-let draw (drawOp : DrawOp) (builder : CanvasBuilder) : CanvasBuilder =
-    { builder with DrawOps = builder.DrawOps @ [drawOp] }
+                lastFpsUpdate <- timestamp
+                framesSinceLastFpsUpdate <- 0
 
-let playing value (builder : CanvasBuilder) : CanvasBuilder =
-    { builder with IsPlaying = value }
+            framesSinceLastFpsUpdate <- framesSinceLastFpsUpdate + 1
 
-let onTick callback (builder : CanvasBuilder) : CanvasBuilder =
-    { builder with OnTick = callback }
+            numUpdateSteps <- 0
+            forceBreak <- false
+            while frameDelta >= simulationTimestep && not forceBreak do
+                update simulationTimestep
+                frameDelta <- frameDelta - simulationTimestep
 
-let onMouseMove callback (builder : CanvasBuilder) : CanvasBuilder =
-    { builder with OnMouseMove = callback}
+                numUpdateSteps <- numUpdateSteps + 1
+                if numUpdateSteps >= 240 then
+                    panic <- true
+                    forceBreak <- true
 
-let withStyle style (builder : CanvasBuilder) : CanvasBuilder =
-    { builder with Style = style }
+            draw (frameDelta / simulationTimestep)
 
-let withMaxFPS fps (builder : CanvasBuilder) : CanvasBuilder =
-    { builder with MaxFPS = fps }
+            ``end`` fps panic
 
-let render (builder : CanvasBuilder) =
-    canvas [ Width builder.Size.Width
-             Height builder.Size.Height
-             DrawOps (List.toArray builder.DrawOps)
-             OnTick builder.OnTick
-             IsPlaying builder.IsPlaying
-             OnMouseMove builder.OnMouseMove
-             Style !!(keyValueList CaseRules.LowerFirst builder.Style)
-             MaxFPS builder.MaxFPS ]
+            panic <- false
