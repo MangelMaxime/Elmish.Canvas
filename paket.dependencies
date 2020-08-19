@@ -4,9 +4,7 @@ framework: netstandard2.0
 
 nuget FSharp.Core redirects:force
 nuget Fable.Core
-nuget Thoth.Json
-nuget Fable.PowerPack
-nuget Fable.Import.HMR
+nuget Fable.Browser.Dom
 
 group netcorebuild
     storage:none
@@ -14,7 +12,6 @@ group netcorebuild
     framework: netstandard2.0
 
     clitool dotnet-fake
-    clitool dotnet-fable
     nuget NETStandard.Library.NETFramework
     nuget Fake.DotNet.Cli
     nuget Fake.DotNet.Paket

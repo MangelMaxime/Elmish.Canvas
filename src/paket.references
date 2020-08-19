@@ -1,4 +1,2 @@
 Fable.Core
-Fable.PowerPack
-Thoth.Json
-Fable.Import.HMR
+Fable.Browser.Dom

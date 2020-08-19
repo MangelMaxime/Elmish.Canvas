@@ -1,11 +1,6 @@
 #r "paket: groupref netcorebuild //"
 #load ".fake/build.fsx/intellisense.fsx"
 
-#if !FAKE
-#r "Facades/netstandard"
-#r "netstandard"
-#endif
-
 #nowarn "52"
 
 open Fake.Core
@@ -25,7 +20,7 @@ Target.create "Clean" (fun _ ->
 Target.create "Install" (fun _ ->
     DotNet.restore
         (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
-        "elmish_demos.sln"
+        "Elmish.Canvas.sln"
 )
 
 Target.create "YarnInstall" (fun _ ->
@@ -33,27 +28,19 @@ Target.create "YarnInstall" (fun _ ->
 )
 
 Target.create "Build" (fun _ ->
-    let result =
-        DotNet.exec
-            (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
-            "fable"
-            "webpack --port free -- -p"
-
-    if not result.OK then failwithf "dotnet fable failed with code %i" result.ExitCode
+    Yarn.exec
+        "webpack --mode production"
+        (fun o ->
+            { o with WorkingDirectory = __SOURCE_DIRECTORY__ }
+        )
 )
 
 Target.create "Watch" (fun _ ->
-    let result =
-        DotNet.exec
-            (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
-            "fable"
-            "webpack-dev-server --port free"
-
-    if not result.OK then failwithf "dotnet fable failed with code %i" result.ExitCode
-)
-
-Target.create "Publish" (fun _ ->
-    Yarn.exec "gh-pages -d output" id
+    Yarn.exec
+        "webpack-dev-server --mode development"
+        (fun o ->
+            { o with WorkingDirectory = __SOURCE_DIRECTORY__ }
+        )
 )
 
 // Build order
@@ -61,7 +48,6 @@ Target.create "Publish" (fun _ ->
     ==> "Install"
     ==> "YarnInstall"
     ==> "Build"
-    ==> "Publish"
 
 "Watch"
     <== [ "YarnInstall" ]

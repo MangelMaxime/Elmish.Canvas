@@ -1,5 +1,7 @@
 module App
 
+open Browser.Dom
+
 type Position =
     { X : float
       Y : float }
@@ -106,7 +108,7 @@ In the update function, we handle the "pysics" of our particles
     (**
 We describe the actions needed for drawing a particle on the canvas
     *)
-    let draw (ctx : Browser.CanvasRenderingContext2D) (particle : Particle) (total : int) (width : float) =
+    let draw (ctx : Browser.Types.CanvasRenderingContext2D) (particle : Particle) (total : int) (width : float) =
         let angle = Math.Atan2(particle.Dy, particle.Dx)
         let scale = Math.Cos(Math.PI / 2. * (float particle.Id / float total))
 
@@ -131,14 +133,14 @@ let mutable particles : Particle.Particle array =
             yield Particle.create index
     |]
 
-open Fable.Import
+open Fable.Core
 open Fable.Core.JsInterop
 
-let canvas = Browser.document.getElementById "app" :?> Browser.HTMLCanvasElement
+let canvas = document.getElementById "app" :?> Browser.Types.HTMLCanvasElement
 let context = canvas.getContext_2d()
 
-canvas.width <- Browser.window.innerWidth
-canvas.height <- Browser.window.innerHeight
+canvas.width <- window.innerWidth
+canvas.height <- window.innerHeight
 
 let runner = Canvas.Runner()
 
@@ -173,7 +175,7 @@ let ``end`` fps panic =
     // Display FPS
     if panic then
         let discardedTime = runner.ResetFrameDelta()
-        Browser.console.warn("Runner panicked, probably because the browser tab was put in the background. Discarding " + string discardedTime + "ms");
+        console.warn("Runner panicked, probably because the browser tab was put in the background. Discarding " + string discardedTime + "ms");
 
 runner.Begin <- ``begin``
 runner.Update <- update

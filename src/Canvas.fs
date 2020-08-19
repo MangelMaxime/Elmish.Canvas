@@ -2,6 +2,7 @@ module Canvas
 
 open Fable.Core
 open Fable.Import
+open Browser.Dom
 
 // The runner class is a port of https://github.com/IceCreamYou/MainLoop.js/
 // The following license has been copied from MainLoop.js repo
@@ -155,7 +156,7 @@ type Runner() =
         if not started then
             started <- true
 
-            rafHandle <- Browser.window.requestAnimationFrame(fun timestamp ->
+            rafHandle <- window.requestAnimationFrame(fun timestamp ->
                 draw(1.)
                 running <- true
 
@@ -164,19 +165,19 @@ type Runner() =
                 framesSinceLastFpsUpdate <- 0
 
                 // Start the main loop.
-                rafHandle <- Browser.window.requestAnimationFrame(this.Animate)
+                rafHandle <- window.requestAnimationFrame(this.Animate)
             )
 
     member __.Stop() =
         running <- false
         started <- false
-        Browser.window.cancelAnimationFrame(rafHandle)
+        window.cancelAnimationFrame(rafHandle)
 
     member __.IsRunning
         with get() = running
 
     member this.Animate(timestamp : float) =
-        rafHandle <- Browser.window.requestAnimationFrame(this.Animate)
+        rafHandle <- window.requestAnimationFrame(this.Animate)
 
         if (timestamp > lastFrameTimeMs + minFrameDelay) then
             frameDelta <- frameDelta + timestamp - lastFrameTimeMs
