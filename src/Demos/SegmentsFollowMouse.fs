@@ -132,8 +132,6 @@ From here this is a standard Elmish component
 module Demo =
 
     open Elmish
-    open Fable.PowerPack
-    open Fable.Import
     open Fable.Core.JsInterop
 
     (**
@@ -255,7 +253,7 @@ module Demo =
         |> Canvas.initialize
         |> Canvas.onTick (fun _ -> dispatch Tick)
         |> Canvas.onMouseMove (fun ev ->
-            let bounds : Browser.ClientRect = !!ev.target?getBoundingClientRect()
+            let bounds : Browser.Types.ClientRect = !!ev.target?getBoundingClientRect()
             { X = ev.clientX - bounds.left
               Y = ev.clientY - bounds.top }
             |> MouseMove
@@ -273,8 +271,8 @@ module Demo =
 /// - etc.
 ////////////////////////////////////////////////////////////////////
 open Elmish
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
+open Fable.React
+open Fable.React.Props
 open Fulma
 open Thoth.Elmish
 open System
@@ -396,7 +394,7 @@ let settings model dispatch =
             [ Label.label [ ]
                 [ str "Follow speed"
                   Control.div [ ]
-                    [ Input.number [ Input.OnChange (fun ev ->
+                    [ Input.input  [ Input.OnChange (fun ev ->
                                                     ev.Value
                                                     |> ChangeFollowSpeed
                                                     |> dispatch)
@@ -409,7 +407,7 @@ let settings model dispatch =
             [ Label.label [ ]
                 [ str "Size"
                   Control.div [ ]
-                    [ Input.number [ Input.OnChange (fun ev ->
+                    [ Input.input  [ Input.OnChange (fun ev ->
                                                     ev.Value
                                                     |> ChangeSize
                                                     |> dispatch)

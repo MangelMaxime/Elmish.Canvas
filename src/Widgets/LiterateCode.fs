@@ -1,12 +1,9 @@
 module LiterateCode
 
 open Fable.Core
-open Fable.Helpers
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
+open Fable.React
+open Fable.React.Props
 open Fulma
-open Fable.PowerPack
-open Fable.Import
 
 type Paragraph =
     | Code of string
@@ -116,18 +113,16 @@ let parseText (text : string) =
         | _ -> true
     )
 
-[<Pojo>]
 type Props =
     { FilePath : string
       Separator : string
       Url : string }
 
-[<Pojo>]
 type State =
     { Content : Paragraph list }
 
 type LiterateCode (props) =
-    inherit React.Component<Props, State>(props)
+    inherit Component<Props, State>(props)
     do base.setInitState({ Content = [] })
 
     member this.fileUrl
@@ -148,7 +143,7 @@ type LiterateCode (props) =
         |> Promise.start
 
     member this.setContent(text) =
-        this.setState({ this.state with Content = text })
+        this.setState(fun state props -> { state with Content = text })
 
     override this.render() =
         let text =

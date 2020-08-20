@@ -2,8 +2,8 @@ module Canvas
 
 open Fable.Core
 open Fable.Import
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
+open Fable.React
+open Fable.React.Props
 open Elmish
 
 type DrawOp =
@@ -46,7 +46,7 @@ type private Props =
     | DrawOps of DrawOp array
     | OnTick of ((float * float) -> unit)
     | IsPlaying of bool
-    | OnMouseMove of (React.MouseEvent -> unit)
+    | OnMouseMove of (Browser.Types.MouseEvent -> unit)
     | Style of HTMLAttr
 
 open Fable.Core.JsInterop
@@ -60,10 +60,10 @@ type CanvasBuilder =
       DrawOps : DrawOp list
       IsPlaying : bool
       OnTick : (float * float) -> unit
-      OnMouseMove : React.MouseEvent -> unit
+      OnMouseMove : Browser.Types.MouseEvent -> unit
       Style : CSSProp list }
 
-let inline private canvas (props: Props list) : React.ReactElement =
+let inline private canvas (props: Props list) : ReactElement =
     ofImport "default" "./js/react_canvas.js" (keyValueList CaseRules.LowerFirst props) [ ]
 
 let initialize (size : Size) : CanvasBuilder =

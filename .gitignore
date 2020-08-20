@@ -1,3 +1,4 @@
+.DS_Store
 packages/
 paket-files/
 paket.local
@@ -10,4 +11,4 @@ output/
 .fake/
 temp/
 
-yarn-error\.log
+.ionide/

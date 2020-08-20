@@ -4,10 +4,12 @@ Fable.Elmish.React
 Fable.Elmish.Browser
 Fable.Elmish.Debugger
 Fable.Elmish.HMR
-Fable.PowerPack
 Fable.React
 Fulma
 Fulma.Extensions
 Thoth.Json
 Thoth.Elmish
-Fable.Import.HMR
+Fable.FontAwesome
+Fable.FontAwesome.Free
+Fable.Promise
+Fable.Fetch

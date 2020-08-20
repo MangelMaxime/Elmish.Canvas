@@ -1,11 +1,10 @@
 module App
 
 open Elmish
-open Fable.Helpers.React
-open Fable.Helpers.React.Props
+open Fable.React
+open Fable.React.Props
 open Fulma
-open Fulma.FontAwesome
-open Fable.Import
+open Fable.FontAwesome
 
 type Demo =
     | SegmentsFollowMouse of Demos.SegmentsFollowMouse.Model
@@ -24,7 +23,7 @@ type Msg =
 let urlUpdate (result : Option<Router.Route>) model =
     match result with
     | None ->
-        Browser.console.error("Error parsing url: " + Browser.window.location.href)
+        Browser.Dom.console.error("Error parsing url: " + Browser.Dom.window.location.href)
         model, Router.modifyUrl model.CurrentRoute
 
     | Some page ->
@@ -82,9 +81,9 @@ let menu =
     Card.card [ ]
         [ Card.header [ ]
             [ Card.Header.title [ ]
-                [ Icon.faIcon [ ]
-                    [ Fa.icon Fa.I.Laptop
-                      Fa.faLg ]
+                [ Icon.icon [ ]
+                    [ Fa.i [ Fa.Solid.Laptop; Fa.Size Fa.FaLarge ]
+                        [ ] ]
                   str "Samples" ] ]
           Card.content [ ]
             [ // Menu rendering
@@ -96,9 +95,9 @@ let about =
     Card.card [ ]
         [ Card.header [ ]
             [ Card.Header.title [ ]
-                [ Icon.faIcon [ ]
-                    [ Fa.icon Fa.I.Info
-                      Fa.faLg ]
+                [ Icon.icon [ ]
+                    [ Fa.i [ Fa.Solid.Info; Fa.Size Fa.FaLarge ]
+                        [ ] ]
                   str "About" ] ]
           Card.content [ ]
             [ a [ ]
@@ -125,10 +124,10 @@ let private view model dispatch =
                 [ content ] ] ]
 
 open Elmish.React
-open Elmish.Browser.Navigation
-open Elmish.Browser.UrlParser
+open Elmish.Navigation
+open Elmish.UrlParser
 
 Program.mkProgram init update view
 |> Program.toNavigable (parseHash Router.pageParser) urlUpdate
-|> Program.withReactUnoptimized "elmish-app"
+|> Program.withReactSynchronous "elmish-app"
 |> Program.run

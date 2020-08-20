@@ -3,7 +3,6 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Mouse.fs" />
     <Compile Include="Libs/ReactResizeDetector.fs" />
     <Compile Include="Libs/ReactHighlight.fs" />
     <Compile Include="Libs/Fable.Import.Showdown.fs" />

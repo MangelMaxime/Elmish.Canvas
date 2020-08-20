@@ -13,7 +13,7 @@ module Render =
 
     open Fable.Import
     open Fulma
-    open Fable.Helpers.React.Props
+    open Fable.React.Props
 
     let converter = Showdown.Globals.Converter.Create()
 
